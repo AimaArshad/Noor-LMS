@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: educonnect-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: educonnect
+      POSTGRES_PASSWORD: educonnect
+      POSTGRES_DB: educonnect
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U educonnect -d educonnect"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: educonnect-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: educonnect-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      # Override hostnames so containers talk to each other (not localhost)
+      DATABASE_URL: postgresql+asyncpg://educonnect:educonnect@postgres:5432/educonnect
+      REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_STORAGE_URI: redis://redis:6379/1
+      STORAGE_DIR: /app/storage
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Dev mode: hot reload. Remove --reload and the ./backend/app mount for production.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers
+    volumes:
+      - ./backend/app:/app/app
+      - storage_data:/app/storage
+
+volumes:
+  postgres_data:
+  redis_data:
+  storage_data:
