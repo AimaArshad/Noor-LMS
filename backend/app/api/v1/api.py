@@ -1,6 +1,8 @@
-"""Aggregate router for API v1. Feature routers are included here in later steps."""
+"""Aggregate router for API v1. Feature routers are included here."""
 
 from fastapi import APIRouter
+
+from app.api.v1.routers import auth
 
 api_router = APIRouter()
 
@@ -11,6 +13,13 @@ async def ping() -> dict[str, str]:
     return {"message": "pong", "version": "v1"}
 
 
+api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
+
 # Later steps:
 # api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 # api_router.include_router(users.router, prefix="/users", tags=["users"])
+
+
+# Later steps:
+# api_router.include_router(users.router, prefix="/users", tags=["users"])
+# api_router.include_router(classrooms.router, prefix="/classrooms", tags=["classrooms"])

@@ -20,6 +20,9 @@ from app.core.config import settings
 from app.core.rate_limit import limiter
 from app.db.session import engine, get_db
 
+# add with the other imports
+from app.core.redis import close_redis
+
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -32,7 +35,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Startup / shutdown hooks."""
     settings.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     logger.info("Starting %s v%s [%s]", settings.PROJECT_NAME, settings.VERSION, settings.ENVIRONMENT)
+    # in lifespan(), after `yield`: to close redis on shutdown
     yield
+    await close_redis()          # ← add this line
     await engine.dispose()
     logger.info("Database engine disposed. Shutdown complete.")
 
