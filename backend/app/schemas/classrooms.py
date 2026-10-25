@@ -4,7 +4,7 @@ import re
 import uuid
 from datetime import datetime
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 
 from app.models.enums import MemberRole
 from app.schemas.common import (
@@ -37,9 +37,17 @@ class ClassroomUpdate(UpdateModel):
 
 
 class ClassroomJoin(RequestModel):
-    """Body of ``POST /classrooms/join``. The code is normalised to upper case."""
+    """Body of ``POST /classrooms/join``: ``{"join_code": "AB3K7QX"}``.
 
-    code: str = Field(min_length=4, max_length=16)
+    The legacy key ``code`` is accepted too. The value is normalised to upper case.
+    """
+
+    code: str = Field(
+        min_length=4,
+        max_length=16,
+        validation_alias=AliasChoices("join_code", "code"),
+        description="The classroom join code (case-insensitive).",
+    )
 
     @field_validator("code")
     @classmethod
@@ -51,7 +59,7 @@ class ClassroomJoin(RequestModel):
 
 
 class ClassroomRead(ORMModel):
-    """Classroom as seen by students (``join_code`` intentionally NOT included)."""
+    """Classroom without the join code (safe default for any ORM object)."""
 
     id: uuid.UUID
     name: str
@@ -65,9 +73,23 @@ class ClassroomRead(ORMModel):
 
 
 class ClassroomTeacherRead(ClassroomRead):
-    """Classroom as seen by its teachers: also exposes the join code."""
+    """Classroom including the join code (kept for internal/teacher-only use)."""
 
     join_code: str
+
+
+class ClassroomDetail(ClassroomRead):
+    """API response for every classroom endpoint.
+
+    * ``my_role``: the caller's role inside this classroom.
+    * ``join_code``: only populated for classroom teachers, otherwise ``null``.
+
+    Build it with ``ClassroomService.build_detail``. Do not validate it straight
+    from an ORM object, or the join code would leak to students.
+    """
+
+    my_role: MemberRole
+    join_code: str | None = Field(default=None, description="Visible to classroom teachers only")
 
 
 class ClassroomMemberRead(ORMModel):
