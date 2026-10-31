@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -17,11 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.api import api_router
 from app.core.config import settings
+from app.core.middleware import MaxBodySizeMiddleware
 from app.core.rate_limit import limiter
-from app.db.session import engine, get_db
-
-# add with the other imports
 from app.core.redis import close_redis
+from app.db.session import engine, get_db
 
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
@@ -29,15 +29,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("educonnect")
 
+# multipart boundaries + form field headers on top of the file itself
+_MULTIPART_OVERHEAD_BYTES = 64 * 1024
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """Startup / shutdown hooks."""
     settings.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     logger.info("Starting %s v%s [%s]", settings.PROJECT_NAME, settings.VERSION, settings.ENVIRONMENT)
-    # in lifespan(), after `yield`: to close redis on shutdown
     yield
-    await close_redis()          # ← add this line
+    await close_redis()
     await engine.dispose()
     logger.info("Database engine disposed. Shutdown complete.")
 
@@ -59,13 +61,21 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
     app.add_middleware(SlowAPIMiddleware)
 
+    # ---- Upload size guard (added BEFORE CORS so CORS headers wrap its 413 responses) ----
+    app.add_middleware(
+        MaxBodySizeMiddleware,
+        max_bytes=settings.max_upload_size_bytes + _MULTIPART_OVERHEAD_BYTES,
+        path=f"{settings.API_V1_PREFIX}/files/upload",
+    )
+
     # ---- CORS ----
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "Range"],
+        expose_headers=["Content-Range", "Content-Disposition", "Accept-Ranges"],
     )
 
     # ---- Global error handler (never leak internals) ----
@@ -103,6 +113,18 @@ def create_app() -> FastAPI:
 
     # ---- API v1 ----
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+    # ---- DEV ONLY: raw static access to stored files ----
+    # WARNING: this bypasses authentication. Never enabled outside development;
+    # the real download path is the authenticated GET /api/v1/files/{id}.
+    if settings.ENVIRONMENT == "development":
+        settings.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+        app.mount(
+            "/static/uploads",
+            StaticFiles(directory=settings.STORAGE_DIR),
+            name="dev-uploads",
+        )
+        logger.warning("DEV ONLY: %s is served unauthenticated at /static/uploads", settings.STORAGE_DIR)
 
     return app
 

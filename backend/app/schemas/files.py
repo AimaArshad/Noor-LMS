@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, Field, StringConstraints
+from pydantic import AfterValidator, Field, StringConstraints, computed_field
 
 from app.schemas.common import ORMModel, RequestModel, Str255, UpdateModel
 
@@ -31,7 +31,7 @@ SafeFilename = Annotated[
 
 
 class FileCreate(RequestModel):
-    """Internal DTO used by the storage service after a successful upload."""
+    """Internal DTO used by the file service after a successful upload."""
 
     uploader_id: uuid.UUID | None = None
     original_name: SafeFilename
@@ -51,9 +51,18 @@ class FileUpdate(UpdateModel):
 
 
 class FileRead(ORMModel):
+    """Public file metadata. ``download_url`` is the authenticated download endpoint."""
+
     id: uuid.UUID
     uploader_id: uuid.UUID | None = None
     original_name: str
     mime_type: str
     size_bytes: int
     created_at: datetime
+
+    @computed_field(description="Authenticated endpoint that streams this file")  # type: ignore[prop-decorator]
+    @property
+    def download_url(self) -> str:
+        from app.core.config import settings  # lazy: keeps the schema module import-light
+
+        return f"{settings.API_V1_PREFIX}/files/{self.id}"
