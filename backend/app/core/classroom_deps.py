@@ -9,6 +9,9 @@ Use them in any router whose path contains ``{classroom_id}``::
 * :data:`ClassroomTeacherAccess` - teacher members, or an admin
 * :data:`ClassroomOwnerAccess`   - the owner, or an admin
 
+Routes that only know a child id (assignment, submission, ...) call
+:func:`resolve_classroom_access` directly (see ``assignment_deps.py``).
+
 Non-members receive ``404`` (not ``403``) so classroom ids cannot be enumerated.
 All dependencies share the request's DB session, so ``access.classroom`` and
 ``access.member`` can be modified/deleted by a service using the same session.
@@ -49,10 +52,8 @@ class ClassroomAccess:
         return self.classroom.owner_id == self.user.id
 
 
-async def get_classroom_access(
-    classroom_id: uuid.UUID,
-    user: CurrentUser,
-    db: Annotated[AsyncSession, Depends(get_db)],
+async def resolve_classroom_access(
+    db: AsyncSession, classroom_id: uuid.UUID, user: User
 ) -> ClassroomAccess:
     """Load the classroom and the caller's membership with a single query.
 
@@ -86,6 +87,15 @@ async def get_classroom_access(
     return ClassroomAccess(classroom=classroom, user=user, member=member, role=role)
 
 
+async def get_classroom_access(
+    classroom_id: uuid.UUID,
+    user: CurrentUser,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ClassroomAccess:
+    """Dependency form of :func:`resolve_classroom_access` (path param ``classroom_id``)."""
+    return await resolve_classroom_access(db, classroom_id, user)
+
+
 async def require_classroom_member(
     access: Annotated[ClassroomAccess, Depends(get_classroom_access)],
 ) -> ClassroomAccess:
@@ -114,5 +124,3 @@ async def require_classroom_owner(
 ClassroomMemberAccess = Annotated[ClassroomAccess, Depends(require_classroom_member)]
 ClassroomTeacherAccess = Annotated[ClassroomAccess, Depends(require_classroom_teacher)]
 ClassroomOwnerAccess = Annotated[ClassroomAccess, Depends(require_classroom_owner)]
-
-

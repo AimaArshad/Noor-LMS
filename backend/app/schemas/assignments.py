@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 
 from pydantic import AwareDatetime, Field, model_validator
 
@@ -10,12 +9,12 @@ from app.models.enums import AssignmentState, SubmissionState
 from app.schemas.common import (
     AttachmentList,
     AttachmentRef,
-    Body20k,
     Grade,
     ORMModel,
     OptBody5k,
     OptBody10k,
     OptBody20k,
+    Page,
     RequestModel,
     Score,
     Str255,
@@ -91,10 +90,20 @@ class SubmissionRead(ORMModel):
     updated_at: datetime
 
 
+class SubmissionList(Page[SubmissionRead]):
+    """Teacher view of an assignment's submissions.
+
+    ``not_submitted_count`` = current students who have no submission yet.
+    """
+
+    not_submitted_count: int = Field(default=0, ge=0)
+
+
 class GradeSubmission(RequestModel):
     """Body of ``PATCH /submissions/{id}/grade``.
 
-    The service must also verify ``grade <= assignment.max_points``.
+    The service also verifies ``grade <= assignment.max_points``. Omit ``feedback``
+    to keep the existing feedback; send ``null``/blank to clear it.
     """
 
     grade: Grade
@@ -105,3 +114,5 @@ class ReturnSubmission(RequestModel):
     """Optional body of ``PATCH /submissions/{id}/return``."""
 
     feedback: OptBody5k = None
+
+
