@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from app.schemas.common import (
     ORMModel,
@@ -26,12 +26,14 @@ class NotificationCreate(RequestModel):
 
 
 class NotificationUpdate(RequestModel):
-    """Body for marking a notification read/unread. Defaults to ``is_read=true``."""
+    """Reserved: marking a notification read/unread. Defaults to ``is_read=true``."""
 
     is_read: bool = True
 
 
 class NotificationRead(ORMModel):
+    """Same shape over REST and in WebSocket ``notification`` messages."""
+
     id: uuid.UUID
     user_id: uuid.UUID
     title: str
@@ -46,3 +48,15 @@ class NotificationPage(Page[NotificationRead]):
     """Paginated notifications plus the unread counter for the bell icon."""
 
     unread_count: int = Field(default=0, ge=0)
+
+
+class UnreadCount(BaseModel):
+    """Response of ``GET /notifications/unread-count``."""
+
+    unread_count: int = Field(ge=0)
+
+
+class ReadAllResult(BaseModel):
+    """Response of ``POST /notifications/read-all``."""
+
+    updated: int = Field(ge=0)

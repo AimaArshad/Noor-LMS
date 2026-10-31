@@ -23,6 +23,10 @@ from app.core.rate_limit import limiter
 from app.core.redis import close_redis
 from app.db.session import engine, get_db
 
+# 1) add with the other imports
+from app.websockets.manager import manager as ws_manager
+from app.websockets.routes import router as ws_router
+
 logging.basicConfig(
     level=logging.DEBUG if settings.DEBUG else logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -39,6 +43,8 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     logger.info("Starting %s v%s [%s]", settings.PROJECT_NAME, settings.VERSION, settings.ENVIRONMENT)
     yield
+    await ws_manager.close_all()      # 2) ← add this line
+    
     await close_redis()
     await engine.dispose()
     logger.info("Database engine disposed. Shutdown complete.")
@@ -113,6 +119,7 @@ def create_app() -> FastAPI:
 
     # ---- API v1 ----
     app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+    app.include_router(ws_router)     #  3)← add: serves /ws/notifications (outside /api/v1)
 
     # ---- DEV ONLY: raw static access to stored files ----
     # WARNING: this bypasses authentication. Never enabled outside development;

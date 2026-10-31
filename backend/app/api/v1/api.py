@@ -9,7 +9,10 @@ from app.api.v1.routers import (
     classrooms,
     comments,
     files,
+    materials,
+    notifications,
     quizzes,
+    todo,
 )
 
 api_router = APIRouter()
@@ -42,8 +45,15 @@ api_router.include_router(
     tags=["quizzes"],
 )
 api_router.include_router(quizzes.router, prefix="/quizzes", tags=["quizzes"])
+api_router.include_router(
+    materials.router,
+    prefix="/classrooms/{classroom_id}/materials",
+    tags=["materials"],
+)
 api_router.include_router(comments.router, prefix="/comments", tags=["comments"])
 api_router.include_router(files.router, prefix="/files", tags=["files"])
+api_router.include_router(todo.router, prefix="/todo", tags=["todo"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 
 # Later steps:
 # api_router.include_router(users.router, prefix="/users", tags=["users"])

@@ -26,7 +26,7 @@ from app.models import (
     Classroom,
     ClassroomMember,
     MemberRole,
-    Notification,
+    # Notification,
     Submission,
     SubmissionState,
     TodoItem,
@@ -46,6 +46,9 @@ from app.schemas.assignments import (
 from app.schemas.common import AttachmentRef, Page
 from app.services.file_service import FileService
 from app.services.guards import ensure_not_archived
+
+# add this import with the other app.services imports  # and remove `Notification,` from the `from app.models import (...)` list (no longer used)
+from app.services.notification_service import stage_notification
 
 logger = logging.getLogger("educonnect.assignments")
 
@@ -380,15 +383,22 @@ class AssignmentService:
             submission.graded_by = None
 
         for teacher_id in await self._teacher_ids(classroom_id):
-            self.db.add(
-                Notification(
-                    user_id=teacher_id,
-                    title=_clip(f"{student_name} turned in {assignment_title}"),
-                    body=None,
-                    type="submission_turned_in",
-                    link=_assignment_link(classroom_id, assignment_id),
-                )
+            stage_notification(
+                self.db,
+                user_id=teacher_id,
+                title=_clip(f"{student_name} turned in {assignment_title}"),
+                type="submission_turned_in",
+                link=_assignment_link(classroom_id, assignment_id),
             )
+            # self.db.add(
+            #     Notification(
+            #         user_id=teacher_id,
+            #         title=_clip(f"{student_name} turned in {assignment_title}"),
+            #         body=None,
+            #         type="submission_turned_in",
+            #         link=_assignment_link(classroom_id, assignment_id),
+            #     )
+            # )
         try:
             await self.db.commit()
         except IntegrityError as exc:  # two simultaneous first submissions
@@ -520,15 +530,21 @@ class AssignmentService:
         if data is not None and "feedback" in data.model_fields_set:
             submission.feedback = data.feedback
         submission.state = SubmissionState.RETURNED
-
-        self.db.add(
-            Notification(
-                user_id=student_id,
-                title=_clip(f"Your work on {assignment.title} was returned"),
-                body=None,
-                type="submission_returned",
-                link=_assignment_link(assignment.classroom_id, assignment.id),
-            )
+        stage_notification(
+            self.db,
+            user_id=student_id,
+            title=_clip(f"Your work on {assignment.title} was returned"),
+            type="submission_returned",
+            link=_assignment_link(assignment.classroom_id, assignment.id),
         )
+        # self.db.add(
+        #     Notification(
+        #         user_id=student_id,
+        #         title=_clip(f"Your work on {assignment.title} was returned"),
+        #         body=None,
+        #         type="submission_returned",
+        #         link=_assignment_link(assignment.classroom_id, assignment.id),
+        #     )
+        # )
         await self.db.commit()
         return await self._load_submission(submission_id)
