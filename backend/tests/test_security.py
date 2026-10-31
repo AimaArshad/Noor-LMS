@@ -44,15 +44,34 @@ def test_expired_token_rejected() -> None:
     with pytest.raises(TokenError, match="expired"):
         decode_token(token)
 
+ 
+# def test_tampered_token_rejected() -> None:
+#     token = create_access_token(uuid.uuid4())
+#     flipped = "A" if token[-1] != "A" else "B"
+#     with pytest.raises(TokenError):
+#         decode_token(token[:-1] + flipped)
+#     with pytest.raises(TokenError):
+#         decode_token("not.a.jwt")
 
+# RESOLVES ==================== short test summary info ====================
+# FAILED tests/test_security.py::test_tampered_token_rejected - Failed: DID NOT RAISE <class 'app.core.security.TokenError'>
+# 1 failed, 142 passed, 357 warnings in 312.80s (0:05:12)
 def test_tampered_token_rejected() -> None:
     token = create_access_token(uuid.uuid4())
-    flipped = "A" if token[-1] != "A" else "B"
+    header, payload, signature = token.split(".")
+
+    i = len(signature) // 2
+    tampered_sig = signature[:i] + ("A" if signature[i] != "A" else "B") + signature[i + 1:]
     with pytest.raises(TokenError):
-        decode_token(token[:-1] + flipped)
+        decode_token(f"{header}.{payload}.{tampered_sig}")
+
+    i = len(payload) // 2
+    tampered_payload = payload[:i] + ("A" if payload[i] != "A" else "B") + payload[i + 1:]
+    with pytest.raises(TokenError):
+        decode_token(f"{header}.{tampered_payload}.{signature}")
+
     with pytest.raises(TokenError):
         decode_token("not.a.jwt")
-
 
 def test_alg_none_token_rejected() -> None:
     def b64(data: dict) -> str:

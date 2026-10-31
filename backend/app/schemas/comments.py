@@ -1,7 +1,7 @@
 """Comment schemas.
 
-The target (assignment/announcement) comes from the URL path, so create/update
-bodies only contain the text.
+Comments are generic: ``POST /comments`` names its target (assignment or
+announcement) in the body, and ``GET /comments`` takes it as query parameters.
 """
 
 import uuid
@@ -13,10 +13,16 @@ from app.schemas.users import UserPublic
 
 
 class CommentCreate(RequestModel):
+    """Body of ``POST /comments``."""
+
+    target_type: CommentTarget
+    target_id: uuid.UUID
     body: Body5k
 
 
 class CommentUpdate(UpdateModel):
+    """Reserved for a future ``PATCH /comments/{id}`` (not exposed yet)."""
+
     non_nullable = frozenset({"body"})
 
     body: Body5k | None = None

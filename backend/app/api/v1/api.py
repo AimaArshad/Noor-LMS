@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.routers import auth, classrooms, files
+from app.api.v1.routers import announcements, auth, classrooms, comments, files
 
 api_router = APIRouter()
 
@@ -15,6 +15,13 @@ async def ping() -> dict[str, str]:
 
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(classrooms.router, prefix="/classrooms", tags=["classrooms"])
+# The prefix contains {classroom_id}, which the classroom access dependencies read.
+api_router.include_router(
+    announcements.router,
+    prefix="/classrooms/{classroom_id}/announcements",
+    tags=["announcements"],
+)
+api_router.include_router(comments.router, prefix="/comments", tags=["comments"])
 api_router.include_router(files.router, prefix="/files", tags=["files"])
 
 # Later steps:
