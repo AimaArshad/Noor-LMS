@@ -2,7 +2,15 @@
 
 from fastapi import APIRouter
 
-from app.api.v1.routers import announcements, assignments, auth, classrooms, comments, files
+from app.api.v1.routers import (
+    announcements,
+    assignments,
+    auth,
+    classrooms,
+    comments,
+    files,
+    quizzes,
+)
 
 api_router = APIRouter()
 
@@ -28,9 +36,14 @@ api_router.include_router(
 )
 api_router.include_router(assignments.router, prefix="/assignments", tags=["assignments"])
 api_router.include_router(assignments.submissions_router, prefix="/submissions", tags=["submissions"])
+api_router.include_router(
+    quizzes.classroom_router,
+    prefix="/classrooms/{classroom_id}/quizzes",
+    tags=["quizzes"],
+)
+api_router.include_router(quizzes.router, prefix="/quizzes", tags=["quizzes"])
 api_router.include_router(comments.router, prefix="/comments", tags=["comments"])
 api_router.include_router(files.router, prefix="/files", tags=["files"])
 
 # Later steps:
 # api_router.include_router(users.router, prefix="/users", tags=["users"])
-

@@ -2,11 +2,15 @@
 
 Security: student-facing schemas (``*Public`` / ``QuizStudentRead``) never contain
 ``is_correct`` and never expose accepted short answers.
+
+``QuizRead`` / ``QuizStudentRead`` carry a ``view`` discriminator so endpoints that
+return either one (``GET /quizzes/{id}``) have an unambiguous response model.
 """
 
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
@@ -14,6 +18,7 @@ from app.models.enums import QuestionType
 from app.schemas.common import (
     Body5k,
     Body10k,
+    Grade,
     ORMModel,
     OptBody5k,
     OptBody10k,
@@ -24,9 +29,12 @@ from app.schemas.common import (
     Str1000,
     UpdateModel,
 )
+from app.schemas.users import UserPublic
 
 MAX_QUESTIONS = 200
 MAX_OPTIONS = 10
+#: ``quiz_attempts.score`` is NUMERIC(7,2)
+MAX_TOTAL_POINTS = Decimal("99999.99")
 
 
 # ------------------------------------------------------------------- creation
@@ -83,6 +91,11 @@ def _normalise_order(questions: list[QuizQuestionCreate]) -> list[QuizQuestionCr
     return questions
 
 
+def _check_total_points(questions: list[QuizQuestionCreate]) -> None:
+    if sum((q.points for q in questions), Decimal("0")) > MAX_TOTAL_POINTS:
+        raise ValueError(f"The total points of a quiz must not exceed {MAX_TOTAL_POINTS}")
+
+
 class QuizCreate(RequestModel):
     """Body of ``POST /classrooms/{id}/quizzes`` (quiz + nested questions + options)."""
 
@@ -91,12 +104,14 @@ class QuizCreate(RequestModel):
     time_limit_minutes: int | None = Field(default=None, gt=0, le=600)
     due_at: AwareDatetime | None = None
     published: bool = False
+    allow_retake: bool = False
     questions: list[QuizQuestionCreate] = Field(default_factory=list, max_length=MAX_QUESTIONS)
 
     @model_validator(mode="after")
     def _validate_quiz(self) -> "QuizCreate":
         if self.published and not self.questions:
             raise ValueError("A published quiz must contain at least one question")
+        _check_total_points(self.questions)
         _normalise_order(self.questions)
         return self
 
@@ -104,21 +119,23 @@ class QuizCreate(RequestModel):
 class QuizUpdate(UpdateModel):
     """PATCH body. If ``questions`` is sent it REPLACES all questions.
 
-    The service must refuse to replace questions once attempts exist.
+    The service refuses to replace questions (or unpublish) once attempts exist.
     """
 
-    non_nullable = frozenset({"title", "published", "questions"})
+    non_nullable = frozenset({"title", "published", "allow_retake", "questions"})
 
     title: Str255 | None = None
     description: OptBody10k = None
     time_limit_minutes: int | None = Field(default=None, gt=0, le=600)
     due_at: AwareDatetime | None = None
     published: bool | None = None
+    allow_retake: bool | None = None
     questions: list[QuizQuestionCreate] | None = Field(default=None, max_length=MAX_QUESTIONS)
 
     @model_validator(mode="after")
     def _validate_quiz_patch(self) -> "QuizUpdate":
         if self.questions is not None:
+            _check_total_points(self.questions)
             _normalise_order(self.questions)
             if self.published is True and not self.questions:
                 raise ValueError("A published quiz must contain at least one question")
@@ -177,6 +194,7 @@ class QuizSummary(ORMModel):
     time_limit_minutes: int | None = None
     due_at: datetime | None = None
     published: bool
+    allow_retake: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -184,12 +202,14 @@ class QuizSummary(ORMModel):
 class QuizRead(QuizSummary):
     """Teacher view with full questions and answer key."""
 
+    view: Literal["teacher"] = "teacher"
     questions: list[QuizQuestionRead] = Field(default_factory=list)
 
 
 class QuizStudentRead(QuizSummary):
     """Student view: questions without the answer key."""
 
+    view: Literal["student"] = "student"
     questions: list[QuizQuestionPublic] = Field(default_factory=list)
 
 
@@ -207,7 +227,11 @@ class AttemptStart(BaseModel):
 
 
 class AnswerSubmit(RequestModel):
-    """A student's answer to one question."""
+    """A student's answer to one question.
+
+    Choice questions (mcq / true_false) need ``selected_option_id``;
+    short-answer questions need ``answer_text``.
+    """
 
     question_id: uuid.UUID
     selected_option_id: uuid.UUID | None = None
@@ -233,7 +257,15 @@ class AttemptSubmit(RequestModel):
         return self
 
 
+class GradeAnswer(RequestModel):
+    """Body of the teacher's manual grading endpoint (must not exceed the question's points)."""
+
+    points_awarded: Grade
+
+
 class AnswerResult(ORMModel):
+    """Per-question result. The answer key is never included."""
+
     question_id: uuid.UUID
     selected_option_id: uuid.UUID | None = None
     answer_text: str | None = None
@@ -242,27 +274,49 @@ class AnswerResult(ORMModel):
 
 
 class AttemptResult(ORMModel):
-    """Result of one attempt. ``answers`` must be eager-loaded.
+    """Result of one attempt. Built by the service (``QuizService.build_result``).
 
-    ``max_score`` and ``pending_manual_grading`` are computed by the service.
+    * ``student`` is filled for teachers only.
+    * ``answers`` is empty while the attempt is open (answers are stored on submit)
+      and for attempts that were closed because the time limit ran out.
     """
 
     id: uuid.UUID
     quiz_id: uuid.UUID
     student_id: uuid.UUID
+    student: UserPublic | None = None
     started_at: datetime
     submitted_at: datetime | None = None
+    expires_at: datetime | None = None
     score: Score | None = None
     max_score: Score | None = None
     pending_manual_grading: bool = False
     answers: list[AnswerResult] = Field(default_factory=list)
 
 
+class MyAttemptRead(BaseModel):
+    """Response of ``GET /quizzes/{id}/my-attempt``."""
+
+    attempt: AttemptResult | None = Field(
+        default=None, description="Your latest attempt (open or finished); null if none"
+    )
+    attempts_used: int = Field(ge=0)
+    can_start: bool = Field(description="True when POST /start would start or resume an attempt")
+
+
 class QuizResults(BaseModel):
-    """Response of ``GET /quizzes/{id}/results`` (teacher)."""
+    """Response of ``GET /quizzes/{id}/results`` (teacher).
+
+    * ``attempt_count``: attempts of current students (open and finished), for paging.
+    * ``average_score``: average of every student's BEST submitted score.
+    """
 
     quiz_id: uuid.UUID
     attempt_count: int = Field(ge=0)
+    submitted_count: int = Field(ge=0)
+    not_attempted_count: int = Field(ge=0)
     average_score: float | None = None
     max_score: Score
+    limit: int = Field(ge=1)
+    offset: int = Field(ge=0)
     attempts: list[AttemptResult] = Field(default_factory=list)
