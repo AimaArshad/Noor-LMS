@@ -11,10 +11,12 @@ EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 FROM base AS build
-# Vite inlines VITE_* values at BUILD time.
-ARG VITE_API_URL
+# Vite inlines VITE_* values at BUILD time. Pass them with
+#   docker build --build-arg VITE_API_BASE_URL=... --build-arg VITE_WS_URL=...
+# or let docker-compose's frontend service supply them.
+ARG VITE_API_BASE_URL
 ARG VITE_WS_URL
-ENV VITE_API_URL=$VITE_API_URL VITE_WS_URL=$VITE_WS_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL VITE_WS_URL=$VITE_WS_URL
 RUN npm run build
 
 FROM nginx:1.27-alpine AS prod
