@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
 import { getErrorMessage } from "@/api/errors";
@@ -14,6 +14,7 @@ import type { RegisterInput } from "@/types";
 export function RegisterPage() {
   useDocumentTitle("Create account");
   const login = useAuthStore((s) => s.login);
+  const location = useLocation();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,7 +50,7 @@ export function RegisterPage() {
       footer={
         <>
           Already registered?{" "}
-          <Link to="/login" className="text-primary underline-offset-4 hover:underline">
+          <Link to="/login" state={location.state} className="text-primary underline-offset-4 hover:underline">
             Sign in
           </Link>
         </>

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { getErrorMessage } from "@/api/errors";
 import { AuthShell } from "@/components/layout/AuthShell";
@@ -12,6 +12,7 @@ import { useAuthStore } from "@/store/auth";
 export function LoginPage() {
   useDocumentTitle("Sign in");
   const login = useAuthStore((s) => s.login);
+  const location = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +39,7 @@ export function LoginPage() {
       footer={
         <>
           No account?{" "}
-          <Link to="/register" className="text-primary underline-offset-4 hover:underline">
+          <Link to="/register" state={location.state} className="text-primary underline-offset-4 hover:underline">
             Create one
           </Link>
         </>
