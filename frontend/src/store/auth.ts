@@ -5,7 +5,7 @@ import { getStatus } from "@/api/errors";
 import { queryClient } from "@/lib/queryClient";
 import type { LoginInput, User } from "@/types";
 
-const STORAGE_KEY = "educonnect.auth.v1";
+const STORAGE_KEY = "noorlms.auth.v1";
 
 interface StoredTokens {
   accessToken: string;

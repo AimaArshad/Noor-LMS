@@ -34,7 +34,7 @@ export function TopNav() {
     <header className="border-b bg-background">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
         <Link to="/" className="text-lg font-bold tracking-tight">
-          EduConnect
+          Noor LMS
         </Link>
 
         <nav aria-label="Main" className="order-last flex w-full gap-1 overflow-x-auto md:order-none md:w-auto">

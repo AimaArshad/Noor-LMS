@@ -14,7 +14,7 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-md">
-        <p className="mb-4 text-center text-2xl font-bold tracking-tight">EduConnect</p>
+        <p className="mb-4 text-center text-2xl font-bold tracking-tight">Noor LMS</p>
         <Card>
           <CardHeader>
             <CardTitle>

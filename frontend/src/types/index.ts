@@ -24,6 +24,19 @@ export type RegisterInput = Omit<components["schemas"]["RegisterRequest"], "role
 
 /** Response of every classroom endpoint (GET /classrooms, /classrooms/{id}). */
 export type Classroom = components["schemas"]["ClassroomDetail"];
+
+/**
+ * Body of POST /classrooms. The generated type also allows `null` for the optional text fields;
+ * the form only ever has "a string" or "absent", so narrow it here.
+ */
+export type ClassroomCreateInput = Omit<
+  components["schemas"]["ClassroomCreate"],
+  "section" | "subject" | "room"
+> & {
+  section?: string;
+  subject?: string;
+  room?: string;
+};
 export type ClassroomMember = components["schemas"]["ClassroomMemberRead"];
 export type ClassroomPeople = components["schemas"]["ClassroomPeople"];
 

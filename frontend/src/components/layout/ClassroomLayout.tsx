@@ -1,6 +1,7 @@
-import { Link, Outlet, useParams } from "react-router-dom";
+import { Link, Outlet, useLocation, useParams } from "react-router-dom";
 
 import { getStatus } from "@/api/errors";
+import { Announcer } from "@/components/common/Announcer";
 import { Spinner } from "@/components/common/Spinner";
 import { ClassroomSidebar } from "@/components/layout/ClassroomSidebar";
 import { useClassroom } from "@/features/classrooms/hooks";
@@ -9,8 +10,11 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 /** Sidebar layout for every /classes/:classroomId/* page. Loads the classroom once. */
 export function ClassroomLayout() {
   const { classroomId = "" } = useParams();
+  const location = useLocation();
   const { data: classroom, isPending, error } = useClassroom(classroomId);
   useDocumentTitle(classroom?.name);
+  // Set by the create / join dialogs: the result of the action that brought the user here.
+  const announcement = (location.state as { announcement?: string } | null)?.announcement;
 
   if (isPending) return <Spinner label="Loading class…" />;
 
@@ -31,6 +35,7 @@ export function ClassroomLayout() {
 
   return (
     <div className="flex flex-col gap-6 md:flex-row">
+      <Announcer message={announcement} />
       <ClassroomSidebar classroom={classroom} />
       <div className="min-w-0 flex-1">
         <Outlet context={{ classroom }} />
