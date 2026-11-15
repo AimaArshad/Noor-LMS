@@ -59,6 +59,24 @@ services:
       - ./backend/alembic:/app/alembic 
       - storage_data:/app/storage
 
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    container_name: educonnect-frontend
+    environment:
+      # These are used by the BROWSER, so they point at the host-published backend port.
+      VITE_API_URL: http://localhost:8000/api/v1
+      VITE_WS_URL: ws://localhost:8000
+      CHOKIDAR_USEPOLLING: "true"      # file watching inside Docker on Windows/macOS
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules              # keep the container's node_modules
+    depends_on:
+      - backend
+
 volumes:
   postgres_data:
   redis_data:
