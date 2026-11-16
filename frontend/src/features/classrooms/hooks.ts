@@ -11,6 +11,7 @@ export const classroomKeys = {
   lists: () => [...root, "list"] as const,
   list: (includeArchived: boolean) => [...root, "list", { includeArchived }] as const,
   detail: (id: string) => [...root, "detail", id] as const,
+  people: (id: string) => [...root, "people", id] as const,
 };
 
 export function useClassrooms(options: { includeArchived?: boolean } = {}) {
@@ -26,6 +27,14 @@ export function useClassroom(id: string) {
   return useQuery({
     queryKey: classroomKeys.detail(id),
     queryFn: () => classroomsApi.get(id),
+    enabled: Boolean(id),
+  });
+}
+
+export function useClassroomPeople(id: string) {
+  return useQuery({
+    queryKey: classroomKeys.people(id),
+    queryFn: () => classroomsApi.people(id),
     enabled: Boolean(id),
   });
 }

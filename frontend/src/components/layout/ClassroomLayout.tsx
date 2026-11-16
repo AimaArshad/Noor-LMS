@@ -3,11 +3,12 @@ import { Link, Outlet, useLocation, useParams } from "react-router-dom";
 import { getStatus } from "@/api/errors";
 import { Announcer } from "@/components/common/Announcer";
 import { Spinner } from "@/components/common/Spinner";
-import { ClassroomSidebar } from "@/components/layout/ClassroomSidebar";
+import { ClassroomHeader } from "@/features/classrooms/components/ClassroomHeader";
+import { ClassroomTabs } from "@/features/classrooms/components/ClassroomTabs";
 import { useClassroom } from "@/features/classrooms/hooks";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
-/** Sidebar layout for every /classes/:classroomId/* page. Loads the classroom once. */
+/** Header + tabs for every /classes/:classroomId/* page. Loads the classroom once. */
 export function ClassroomLayout() {
   const { classroomId = "" } = useParams();
   const location = useLocation();
@@ -34,12 +35,11 @@ export function ClassroomLayout() {
   }
 
   return (
-    <div className="flex flex-col gap-6 md:flex-row">
+    <div className="space-y-6">
       <Announcer message={announcement} />
-      <ClassroomSidebar classroom={classroom} />
-      <div className="min-w-0 flex-1">
-        <Outlet context={{ classroom }} />
-      </div>
+      <ClassroomHeader classroom={classroom} />
+      <ClassroomTabs classroomId={classroom.id} />
+      <Outlet context={{ classroom }} />
     </div>
   );
 }

@@ -1,14 +1,25 @@
-import { PagePlaceholder } from "@/components/common/PagePlaceholder";
+import { AsyncList } from "@/components/common/AsyncList";
 import { useClassroomContext } from "@/features/classrooms/context";
+import { PeopleList } from "@/features/classrooms/components/PeopleList";
+import { useClassroomPeople } from "@/features/classrooms/hooks";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export function PeoplePage() {
   const { classroom } = useClassroomContext();
   useDocumentTitle(`${classroom.name} · People`);
+  const { data, isPending, error, refetch } = useClassroomPeople(classroom.id);
+
   return (
-    <PagePlaceholder
-      title="People"
-      description="Teachers and students of this class will appear here (GET /classrooms/{id}/people)."
-    />
+    <div className="mx-auto max-w-3xl space-y-8">
+      <AsyncList
+        isPending={isPending}
+        error={error}
+        onRetry={() => void refetch()}
+        loadingLabel="Loading people…"
+      >
+        <PeopleList title="Teachers" members={data?.teachers ?? []} />
+        <PeopleList title="Students" members={data?.students ?? []} />
+      </AsyncList>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { api } from "@/api/client";
-import type { Classroom, ClassroomCreateInput } from "@/types";
+import type { Classroom, ClassroomCreateInput, ClassroomPeople } from "@/types";
 
 export const classroomsApi = {
   list: (params?: { include_archived?: boolean; limit?: number; offset?: number }) =>
@@ -13,4 +13,6 @@ export const classroomsApi = {
   /** Joins as a student. 404 = unknown code, 409 = already a member, 403 = archived. */
   join: (joinCode: string) =>
     api.post<Classroom>("/classrooms/join", { join_code: joinCode }).then((r) => r.data),
+
+  people: (id: string) => api.get<ClassroomPeople>(`/classrooms/${id}/people`).then((r) => r.data),
 };

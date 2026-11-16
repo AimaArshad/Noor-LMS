@@ -49,3 +49,51 @@ export interface Page<T> {
   limit: number;
   offset: number;
 }
+
+// --- Step 15: stream, classwork, people, grades -------------------------------------------
+
+export type Announcement = components["schemas"]["AnnouncementRead"];
+
+export type CommentTarget = components["schemas"]["CommentTarget"];
+/** Named `CommentRecord` so it does not shadow the DOM `Comment` type. */
+export type CommentRecord = components["schemas"]["CommentRead"];
+
+export type AttachmentRef = components["schemas"]["AttachmentRef"];
+
+export type AssignmentState = components["schemas"]["AssignmentState"];
+export type Assignment = components["schemas"]["AssignmentRead"];
+
+/**
+ * Body of POST /classrooms/{id}/assignments. The generated type allows `null` for the optional
+ * text fields; the form only ever has "a string" or "absent", so narrow it here.
+ */
+export type AssignmentCreateInput = Omit<
+  components["schemas"]["AssignmentCreate"],
+  "description" | "due_at"
+> & {
+  description?: string;
+  due_at?: string;
+};
+
+export type SubmissionState = components["schemas"]["SubmissionState"];
+export type Submission = components["schemas"]["SubmissionRead"];
+export type SubmissionList = components["schemas"]["SubmissionList"];
+
+export type QuizSummary = components["schemas"]["QuizSummary"];
+
+/** Body of POST /classrooms/{id}/quizzes; same `null` narrowing as assignments. */
+export type QuizCreateInput = Omit<components["schemas"]["QuizCreate"], "description" | "due_at"> & {
+  description?: string;
+  due_at?: string;
+};
+
+export type AttemptResult = components["schemas"]["AttemptResult"];
+export type MyAttempt = components["schemas"]["MyAttemptRead"];
+export type QuizResults = components["schemas"]["QuizResults"];
+
+export type Material = components["schemas"]["MaterialRead"];
+
+/** Body of POST /classrooms/{id}/materials; same `null` narrowing as assignments. */
+export type MaterialCreateInput = Omit<components["schemas"]["MaterialCreate"], "description"> & {
+  description?: string;
+};

@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ClassroomLayout } from "@/components/layout/ClassroomLayout";
 import { AdminPage } from "@/pages/AdminPage";
 import { ClassworkPage } from "@/pages/classroom/ClassworkPage";
+import { GradesPage } from "@/pages/classroom/GradesPage";
 import { PeoplePage } from "@/pages/classroom/PeoplePage";
 import { StreamPage } from "@/pages/classroom/StreamPage";
 import { ClassesPage } from "@/pages/ClassesPage";
@@ -14,6 +15,7 @@ import { ProfilePage } from "@/pages/ProfilePage";
 import { RegisterPage } from "@/pages/Register";
 import { TodoPage } from "@/pages/TodoPage";
 import { GuestRoute } from "@/routes/GuestRoute";
+import { ClassroomsRedirect } from "@/routes/ClassroomsRedirect";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { RoleRoute } from "@/routes/RoleRoute";
 
@@ -47,9 +49,11 @@ export const router = createBrowserRouter(
                 { index: true, element: <StreamPage /> },
                 { path: "classwork", element: <ClassworkPage /> },
                 { path: "people", element: <PeoplePage /> },
-                // later steps: classwork/assignments/:id, classwork/quizzes/:id, materials/:id ...
+                { path: "grades", element: <GradesPage /> },
+                // later: classwork/assignments/:id, classwork/quizzes/:id, materials/:id
               ],
             },
+            { path: "classrooms/:classroomId/*", element: <ClassroomsRedirect /> },
             { path: "*", element: <NotFoundPage /> },
           ],
         },
