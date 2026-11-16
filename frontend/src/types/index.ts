@@ -80,6 +80,72 @@ export type Submission = components["schemas"]["SubmissionRead"];
 export type SubmissionList = components["schemas"]["SubmissionList"];
 
 export type QuizSummary = components["schemas"]["QuizSummary"];
+export type QuestionType = components["schemas"]["QuestionType"];
+
+export type QuizOptionPublic = components["schemas"]["QuizOptionPublic"];
+/** Teacher view: includes the answer key. */
+export type QuizOptionKey = components["schemas"]["QuizOptionRead"];
+
+interface QuizQuestionBase {
+  id: string;
+  prompt: string;
+  type: QuestionType;
+  points: number;
+  order_index: number;
+}
+export type StudentQuestion = QuizQuestionBase & { options: QuizOptionPublic[] };
+export type TeacherQuestion = QuizQuestionBase & { quiz_id: string; options: QuizOptionKey[] };
+
+/** `GET /quizzes/{id}` as a student: no answer key. */
+export type StudentQuiz = Omit<components["schemas"]["QuizStudentRead"], "questions"> & {
+  questions: StudentQuestion[];
+};
+/** `GET /quizzes/{id}` as a teacher: with the answer key. */
+export type TeacherQuiz = Omit<components["schemas"]["QuizRead"], "questions"> & {
+  questions: TeacherQuestion[];
+};
+export type QuizView = StudentQuiz | TeacherQuiz;
+
+/** The generated schema marks the nullable fields optional; the API always sends them. */
+export type AnswerResult = Omit<
+  components["schemas"]["AnswerResult"],
+  "selected_option_id" | "answer_text" | "is_correct" | "points_awarded"
+> & {
+  selected_option_id: string | null;
+  answer_text: string | null;
+  /** null = awaiting manual grading */
+  is_correct: boolean | null;
+  points_awarded: number | null;
+};
+
+export type AttemptResult = Omit<
+  components["schemas"]["AttemptResult"],
+  "student" | "submitted_at" | "expires_at" | "score" | "max_score" | "answers"
+> & {
+  student: UserPublic | null;
+  submitted_at: string | null;
+  expires_at: string | null;
+  score: number | null;
+  max_score: number | null;
+  answers: AnswerResult[];
+};
+
+export type AttemptStart = Omit<components["schemas"]["AttemptStart"], "expires_at" | "quiz"> & {
+  expires_at: string | null;
+  quiz: StudentQuiz;
+};
+
+export type MyAttempt = Omit<components["schemas"]["MyAttemptRead"], "attempt"> & {
+  attempt: AttemptResult | null;
+};
+
+export type QuizResults = Omit<
+  components["schemas"]["QuizResults"],
+  "average_score" | "attempts"
+> & {
+  average_score: number | null;
+  attempts: AttemptResult[];
+};
 
 /** Body of POST /classrooms/{id}/quizzes; same `null` narrowing as assignments. */
 export type QuizCreateInput = Omit<components["schemas"]["QuizCreate"], "description" | "due_at"> & {
@@ -87,9 +153,20 @@ export type QuizCreateInput = Omit<components["schemas"]["QuizCreate"], "descrip
   due_at?: string;
 };
 
-export type AttemptResult = components["schemas"]["AttemptResult"];
-export type MyAttempt = components["schemas"]["MyAttemptRead"];
-export type QuizResults = components["schemas"]["QuizResults"];
+export type QuizOptionInput = components["schemas"]["QuizOptionCreate"];
+export type QuizQuestionInput = Omit<
+  components["schemas"]["QuizQuestionCreate"],
+  "points" | "options"
+> & {
+  points: number;
+  options: QuizOptionInput[];
+};
+export type QuizCreatePayload = Omit<QuizCreateInput, "questions"> & {
+  questions: QuizQuestionInput[];
+};
+
+/** Response of POST /files/upload. */
+export type UploadedFile = components["schemas"]["FileRead"];
 
 export type Material = components["schemas"]["MaterialRead"];
 

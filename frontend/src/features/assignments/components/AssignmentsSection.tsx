@@ -1,5 +1,6 @@
 import { Paperclip } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { getErrorMessage } from "@/api/errors";
 import { AsyncList } from "@/components/common/AsyncList";
@@ -24,7 +25,14 @@ function AssignmentItem({ assignment, classroom }: { assignment: Assignment; cla
       <CardContent className="space-y-2 p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <h3 className="break-words font-medium">{assignment.title}</h3>
+            <h3 className="break-words font-medium">
+              <Link
+                to={`/classes/${classroom.id}/assignments/${assignment.id}`}
+                className="underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {assignment.title}
+              </Link>
+            </h3>
             <p className="text-sm text-muted-foreground">
               {assignment.due_at ? (
                 <>

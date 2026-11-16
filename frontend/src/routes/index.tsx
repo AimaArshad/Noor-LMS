@@ -3,9 +3,12 @@ import { createBrowserRouter } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ClassroomLayout } from "@/components/layout/ClassroomLayout";
 import { AdminPage } from "@/pages/AdminPage";
+import { AssignmentPage } from "@/pages/classroom/AssignmentPage";
 import { ClassworkPage } from "@/pages/classroom/ClassworkPage";
 import { GradesPage } from "@/pages/classroom/GradesPage";
 import { PeoplePage } from "@/pages/classroom/PeoplePage";
+import { QuizBuilderPage } from "@/pages/classroom/QuizBuilderPage";
+import { QuizPage } from "@/pages/classroom/QuizPage";
 import { StreamPage } from "@/pages/classroom/StreamPage";
 import { ClassesPage } from "@/pages/ClassesPage";
 import { HomePage } from "@/pages/Home";
@@ -50,7 +53,9 @@ export const router = createBrowserRouter(
                 { path: "classwork", element: <ClassworkPage /> },
                 { path: "people", element: <PeoplePage /> },
                 { path: "grades", element: <GradesPage /> },
-                // later: classwork/assignments/:id, classwork/quizzes/:id, materials/:id
+                { path: "assignments/:assignmentId", element: <AssignmentPage /> },
+                { path: "quizzes/new", element: <QuizBuilderPage /> },
+                { path: "quizzes/:quizId", element: <QuizPage /> },
               ],
             },
             { path: "classrooms/:classroomId/*", element: <ClassroomsRedirect /> },
