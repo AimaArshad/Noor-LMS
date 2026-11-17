@@ -14,5 +14,7 @@ export const classroomsApi = {
   join: (joinCode: string) =>
     api.post<Classroom>("/classrooms/join", { join_code: joinCode }).then((r) => r.data),
 
-  people: (id: string) => api.get<ClassroomPeople>(`/classrooms/${id}/people`).then((r) => r.data),
+  /** Teachers in full, students one page (100 is the API maximum). */
+  people: (id: string) =>
+    api.get<ClassroomPeople>(`/classrooms/${id}/people`, { params: { limit: 100 } }).then((r) => r.data),
 };

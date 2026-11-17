@@ -40,7 +40,8 @@ export type ClassroomCreateInput = Omit<
 export type ClassroomMember = components["schemas"]["ClassroomMemberRead"];
 export type ClassroomPeople = components["schemas"]["ClassroomPeople"];
 
-export type Message = components["schemas"]["Message"];
+/** The API's error envelope: `{ error: { code, message, details } }`. */
+export type ApiError = components["schemas"]["ErrorResponse"];
 
 /** Offset-paginated list response (the API exposes one concrete `Page_*` per resource). */
 export interface Page<T> {

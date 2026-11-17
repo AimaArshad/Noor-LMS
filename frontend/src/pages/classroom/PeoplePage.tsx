@@ -18,7 +18,7 @@ export function PeoplePage() {
         loadingLabel="Loading people…"
       >
         <PeopleList title="Teachers" members={data?.teachers ?? []} />
-        <PeopleList title="Students" members={data?.students ?? []} />
+        <PeopleList title="Students" members={data?.students ?? []} total={data?.students_total} />
       </AsyncList>
     </div>
   );

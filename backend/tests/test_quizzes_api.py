@@ -397,7 +397,7 @@ async def test_time_limit_is_enforced(client: AsyncClient, session_maker) -> Non
     await start(client, ctx, late["id"])
     await shift_start(session_maker, late["id"], 31)
     rejected = await submit(client, ctx, late["id"], [])
-    assert rejected.status_code == 409 and "time limit" in rejected.json()["detail"].lower()
+    assert rejected.status_code == 409 and "time limit" in rejected.json()["error"]["message"].lower()
 
     status_after = (await my_attempt(client, ctx, late["id"])).json()  # auto-closed with score 0
     assert status_after["attempt"]["submitted_at"] is not None and status_after["attempt"]["score"] == 0

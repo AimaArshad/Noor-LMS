@@ -63,6 +63,24 @@ All settings come from environment variables / `.env` (see `.env.example`).
 `JWT_SECRET` must be at least 32 characters and must not contain the placeholder
 `change-me` when `ENVIRONMENT=production`.
 
+Logging is configured with `LOG_LEVEL` and `LOG_FORMAT` (`auto` = JSON lines in
+production/staging, readable text elsewhere). The per-IP limits for `/auth/*` are
+configurable with `AUTH_RATE_LIMIT_REGISTER`, `AUTH_RATE_LIMIT_LOGIN`,
+`AUTH_RATE_LIMIT_REFRESH`, `AUTH_RATE_LIMIT_LOGOUT` and `AUTH_RATE_LIMIT_ME`.
+
+## API conventions
+
+- Errors: `{"error": {"code": "not_found", "message": "…", "details": null}}`; `422` lists
+  each problem in `details`, `429` adds `retry_after_seconds` and a `Retry-After` header.
+- Request ids: every response carries `X-Request-ID` (send your own, 8–64 chars of
+  `A-Za-z0-9._-`), and the same id is on every log line of that request.
+- Pagination: `limit` (1–100) and `offset` (0–100000) on list endpoints; `GET /classrooms`
+  returns the total in `X-Total-Count`.
+- Security headers: `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, a strict CSP,
+  `Cache-Control: no-store` on API responses, and HSTS in production.
+- Free text is normalised (NFC) and stripped of control characters and bidi overrides at
+  the API boundary; HTML is escaped on output, never on input.
+
 ## Tests
 
 ```bash

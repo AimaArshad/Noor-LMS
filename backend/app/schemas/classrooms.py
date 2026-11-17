@@ -101,7 +101,14 @@ class ClassroomMemberRead(ORMModel):
 
 
 class ClassroomPeople(ORMModel):
-    """Response of ``GET /classrooms/{id}/people``."""
+    """Response of ``GET /classrooms/{id}/people``.
+
+    Teachers are always listed in full. Students are paginated: ``students_total`` is the
+    number of students in the class, ``limit`` / ``offset`` describe the returned slice.
+    """
 
     teachers: list[ClassroomMemberRead] = Field(default_factory=list)
     students: list[ClassroomMemberRead] = Field(default_factory=list)
+    students_total: int = Field(default=0, ge=0)
+    limit: int = Field(default=100, ge=1)
+    offset: int = Field(default=0, ge=0)

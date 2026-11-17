@@ -21,6 +21,7 @@ from app.core.classroom_deps import (
     ClassroomTeacherAccess,
 )
 from app.core.deps import require_role
+from app.core.pagination import PageParams, PeoplePageParams
 from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.models import User, UserRole
@@ -70,17 +71,30 @@ async def create_classroom(
     "",
     response_model=list[ClassroomDetail],
     summary="List my classrooms",
+    responses={
+        200: {
+            "headers": {
+                "X-Total-Count": {
+                    "description": "Total classrooms matching the filter (ignores limit/offset).",
+                    "schema": {"type": "integer"},
+                }
+            }
+        }
+    },
 )
 async def list_classrooms(
+    response: Response,
     user: CurrentUser,
     service: Service,
+    page: PageParams,
     include_archived: Annotated[bool, Query(description="Also return archived classrooms")] = False,
-    limit: Annotated[int, Query(ge=1, le=100)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ClassroomDetail]:
     """Classrooms you teach or attend, newest first. Join codes are shown only where you teach."""
     rows = await service.list_for_user(
-        user, include_archived=include_archived, limit=limit, offset=offset
+        user, include_archived=include_archived, limit=page.limit, offset=page.offset
+    )
+    response.headers["X-Total-Count"] = str(
+        await service.count_for_user(user, include_archived=include_archived)
     )
     return [service.build_detail(classroom, role) for classroom, role in rows]
 
@@ -160,8 +174,11 @@ async def leave_classroom(access: ClassroomMemberAccess, service: Service) -> Re
     summary="List teachers and students",
     responses={**_NOT_FOUND},
 )
-async def list_people(access: ClassroomMemberAccess, service: Service) -> ClassroomPeople:
-    return await service.list_people(access.classroom)
+async def list_people(
+    access: ClassroomMemberAccess, service: Service, page: PeoplePageParams
+) -> ClassroomPeople:
+    """All teachers, plus one page of students (``students_total`` tells you how many exist)."""
+    return await service.list_people(access.classroom, limit=page.limit, offset=page.offset)
 
 
 # --- tiny helpers (kept at the bottom to keep the endpoint list readable) ---

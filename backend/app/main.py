@@ -6,31 +6,32 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Request, status
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.api import api_router
 from app.core.config import settings
-from app.core.middleware import MaxBodySizeMiddleware
+from app.core.errors import error_response, register_exception_handlers
+from app.core.logging_config import setup_logging
+from app.core.middleware import (
+    ErrorBoundaryMiddleware,
+    MaxBodySizeMiddleware,
+    RequestContextMiddleware,
+    SecurityHeadersMiddleware,
+)
+from app.core.openapi import API_DESCRIPTION, COMMON_RESPONSES, OPENAPI_TAGS
 from app.core.rate_limit import limiter
 from app.core.redis import close_redis
 from app.db.session import engine, get_db
-
-# 1) add with the other imports
 from app.websockets.manager import manager as ws_manager
 from app.websockets.routes import router as ws_router
 
-logging.basicConfig(
-    level=logging.DEBUG if settings.DEBUG else logging.INFO,
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-)
+setup_logging(level="DEBUG" if settings.DEBUG else settings.LOG_LEVEL, json_logs=settings.json_logs)
 logger = logging.getLogger("educonnect")
 
 # multipart boundaries + form field headers on top of the file itself
@@ -43,8 +44,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
     logger.info("Starting %s v%s [%s]", settings.PROJECT_NAME, settings.VERSION, settings.ENVIRONMENT)
     yield
-    await ws_manager.close_all()      # 2) ← add this line
-    
+    await ws_manager.close_all()
     await close_redis()
     await engine.dispose()
     logger.info("Database engine disposed. Shutdown complete.")
@@ -52,46 +52,62 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 def create_app() -> FastAPI:
     """Application factory."""
+    docs_enabled = not settings.is_production
+    docs_paths = (
+        {"/docs", "/redoc", "/docs/oauth2-redirect", f"{settings.API_V1_PREFIX}/openapi.json"}
+        if docs_enabled
+        else set()
+    )
+
     app = FastAPI(
         title=f"{settings.PROJECT_NAME} API",
         version=settings.VERSION,
-        description="Google Classroom-style learning platform API.",
-        openapi_url=f"{settings.API_V1_PREFIX}/openapi.json",
-        docs_url=None if settings.is_production else "/docs",
-        redoc_url=None if settings.is_production else "/redoc",
+        summary="Google Classroom-style learning platform API.",
+        description=API_DESCRIPTION,
+        openapi_tags=OPENAPI_TAGS,
+        # In production neither the docs nor the schema are published.
+        openapi_url=f"{settings.API_V1_PREFIX}/openapi.json" if docs_enabled else None,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url="/redoc" if docs_enabled else None,
+        swagger_ui_parameters={"persistAuthorization": True, "displayRequestDuration": True},
         lifespan=lifespan,
     )
 
-    # ---- Rate limiting ----
+    # ---- Rate limiting + error envelope ----
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
-    app.add_middleware(SlowAPIMiddleware)
+    register_exception_handlers(app)
 
-    # ---- Upload size guard (added BEFORE CORS so CORS headers wrap its 413 responses) ----
+    # Middleware: the LAST one added is the OUTERMOST. Resulting order, outermost first:
+    # RequestContext -> SecurityHeaders -> CORS -> ErrorBoundary -> MaxBodySize -> SlowAPI -> app
+    app.add_middleware(SlowAPIMiddleware)
     app.add_middleware(
         MaxBodySizeMiddleware,
         max_bytes=settings.max_upload_size_bytes + _MULTIPART_OVERHEAD_BYTES,
         path=f"{settings.API_V1_PREFIX}/files/upload",
     )
-
-    # ---- CORS ----
+    app.add_middleware(ErrorBoundaryMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "Range"],
-        expose_headers=["Content-Range", "Content-Disposition", "Accept-Ranges"],
+        allow_headers=["Authorization", "Content-Type", "Accept", "Range", "X-Request-ID"],
+        expose_headers=[
+            "Content-Range",
+            "Content-Disposition",
+            "Accept-Ranges",
+            "Date",
+            "X-Request-ID",
+            "X-Total-Count",
+        ],
     )
-
-    # ---- Global error handler (never leak internals) ----
-    @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("Unhandled error on %s %s", request.method, request.url.path)
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"detail": "Internal server error"},
-        )
+    app.add_middleware(
+        SecurityHeadersMiddleware,
+        hsts=settings.is_production,
+        files_prefix=f"{settings.API_V1_PREFIX}/files/",
+        relaxed_csp_paths=docs_paths,
+    )
+    app.add_middleware(RequestContextMiddleware)
 
     # ---- Health ----
     @app.get("/health", tags=["meta"], summary="Liveness probe")
@@ -111,27 +127,27 @@ def create_app() -> FastAPI:
             await db.execute(text("SELECT 1"))
         except Exception:
             logger.exception("Readiness check failed")
-            return JSONResponse(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                content={"status": "unavailable", "database": "down"},
+            return error_response(
+                503,
+                "Database unavailable",
+                code="service_unavailable",
+                details={"database": "down"},
             )
         return JSONResponse(content={"status": "ready", "database": "up"})
 
     # ---- API v1 ----
-    app.include_router(api_router, prefix=settings.API_V1_PREFIX)
-    app.include_router(ws_router)     #  3)← add: serves /ws/notifications (outside /api/v1)
+    app.include_router(api_router, prefix=settings.API_V1_PREFIX, responses=COMMON_RESPONSES)
+    app.include_router(ws_router)  # serves /ws/notifications (outside /api/v1)
 
     # ---- DEV ONLY: raw static access to stored files ----
     # WARNING: this bypasses authentication. Never enabled outside development;
     # the real download path is the authenticated GET /api/v1/files/{id}.
     if settings.ENVIRONMENT == "development":
         settings.STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-        app.mount(
-            "/static/uploads",
-            StaticFiles(directory=settings.STORAGE_DIR),
-            name="dev-uploads",
+        app.mount("/static/uploads", StaticFiles(directory=settings.STORAGE_DIR), name="dev-uploads")
+        logger.warning(
+            "DEV ONLY: %s is served unauthenticated at /static/uploads", settings.STORAGE_DIR
         )
-        logger.warning("DEV ONLY: %s is served unauthenticated at /static/uploads", settings.STORAGE_DIR)
 
     return app
 

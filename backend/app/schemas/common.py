@@ -31,6 +31,8 @@ from pydantic import (
     model_validator,
 )
 
+from app.utils.sanitize import clean_line, clean_multiline
+
 # --------------------------------------------------------------------------- #
 # Base classes
 # --------------------------------------------------------------------------- #
@@ -69,32 +71,43 @@ class UpdateModel(RequestModel):
 
 
 # --------------------------------------------------------------------------- #
-# String types
+# String types (the BeforeValidator is LAST so it runs FIRST)
 # --------------------------------------------------------------------------- #
 
 
 def blank_to_none(value: Any) -> Any:
-    """Strip strings and turn blank ones into ``None`` (for optional text fields)."""
+    """Sanitise, strip and turn blank strings into ``None`` (for optional text fields)."""
     if isinstance(value, str):
-        value = value.strip()
+        value = clean_multiline(value).strip()
         return value or None
     return value
 
 
-def _str(max_length: int) -> Any:  # pragma: no cover - helper for aliases below
+def _line(max_length: int) -> Any:  # pragma: no cover - helper for aliases below
     return Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=max_length)
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=max_length),
+        BeforeValidator(clean_line),
     ]
 
 
-# Required, trimmed, non-empty strings.
-Str100 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
-Str200 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-Str255 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
-Str1000 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
-Body5k = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=5_000)]
-Body10k = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=10_000)]
-Body20k = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=20_000)]
+def _body(max_length: int) -> Any:  # pragma: no cover - helper for aliases below
+    return Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=max_length),
+        BeforeValidator(clean_multiline),
+    ]
+
+
+# Required, single-line, trimmed, non-empty strings.
+Str100 = _line(100)
+Str200 = _line(200)
+Str255 = _line(255)
+Str1000 = _line(1000)
+# Required multi-line text (keeps line breaks and tabs).
+Body5k = _body(5_000)
+Body10k = _body(10_000)
+Body20k = _body(20_000)
 
 # Optional strings: blank input ("" or "   ") becomes None.
 OptStr100 = Annotated[Str100 | None, BeforeValidator(blank_to_none)]
@@ -176,7 +189,11 @@ class AttachmentRef(ORMModel):
     """Reference to an uploaded file (see ``POST /files/upload``)."""
 
     file_id: uuid.UUID
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=512)]
+    name: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=512),
+        BeforeValidator(clean_line),
+    ]
     mime_type: str | None = Field(default=None, max_length=255)
 
 
@@ -205,10 +222,27 @@ def dump_attachments(items: list[AttachmentRef]) -> list[dict[str, Any]]:
 T = TypeVar("T")
 
 
-class Message(BaseModel):
-    """Simple ``{"detail": "..."}`` response."""
+class ErrorDetail(BaseModel):
+    """The ``error`` object of every error response."""
 
-    detail: str
+    code: str = Field(
+        description="Stable machine-readable code, e.g. `not_found`, `validation_error`."
+    )
+    message: str = Field(description="Human-readable explanation, safe to show to users.")
+    details: Any | None = Field(
+        default=None,
+        description="Validation issues (`422`), retry hints (`429`) or other structured data; otherwise null.",
+    )
+
+
+class ErrorResponse(BaseModel):
+    """Envelope of every error response: ``{"error": {"code", "message", "details"}}``."""
+
+    error: ErrorDetail
+
+
+#: Kept so routers can keep documenting ``{"model": Message}``.
+Message = ErrorResponse
 
 
 class Page(BaseModel, Generic[T]):

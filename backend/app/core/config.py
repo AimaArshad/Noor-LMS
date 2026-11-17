@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
+from limits import parse as parse_rate_limit
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
@@ -53,9 +54,38 @@ class Settings(BaseSettings):
     RATE_LIMIT_DEFAULT: str = "120/minute"
     RATE_LIMIT_STORAGE_URI: str = "memory://"
 
+    # ---- Logging ----
+    LOG_LEVEL: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+    #: auto = JSON in production/staging, readable text elsewhere
+    LOG_FORMAT: Literal["auto", "json", "text"] = "auto"
+
+    # ---- Per-IP limits for /auth/* (slowapi syntax, e.g. "10/minute") ----
+    AUTH_RATE_LIMIT_REGISTER: str = "5/minute"
+    AUTH_RATE_LIMIT_LOGIN: str = "10/minute"
+    AUTH_RATE_LIMIT_REFRESH: str = "30/minute"
+    AUTH_RATE_LIMIT_LOGOUT: str = "30/minute"
+    AUTH_RATE_LIMIT_ME: str = "60/minute"
+
     # ------------------------------------------------------------------ #
     # Validators
     # ------------------------------------------------------------------ #
+    @field_validator(
+        "RATE_LIMIT_DEFAULT",
+        "AUTH_RATE_LIMIT_REGISTER",
+        "AUTH_RATE_LIMIT_LOGIN",
+        "AUTH_RATE_LIMIT_REFRESH",
+        "AUTH_RATE_LIMIT_LOGOUT",
+        "AUTH_RATE_LIMIT_ME",
+    )
+    @classmethod
+    def _validate_rate_limit(cls, value: str) -> str:
+        """Fail at startup (not on the first request) when a limit string is malformed."""
+        try:
+            parse_rate_limit(value)
+        except ValueError as exc:
+            raise ValueError(f"Invalid rate limit {value!r}; use e.g. '10/minute'") from exc
+        return value
+
     @field_validator("DATABASE_URL")
     @classmethod
     def _validate_database_url(cls, value: str) -> str:
@@ -97,6 +127,13 @@ class Settings(BaseSettings):
     def max_upload_size_bytes(self) -> int:
         """Maximum upload size in bytes."""
         return self.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+
+    @property
+    def json_logs(self) -> bool:
+        """JSON log lines in production/staging (or when forced)."""
+        if self.LOG_FORMAT == "auto":
+            return self.ENVIRONMENT in ("production", "staging")
+        return self.LOG_FORMAT == "json"
 
 
 @lru_cache

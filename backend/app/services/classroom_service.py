@@ -6,7 +6,7 @@ import logging
 import uuid
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import contains_eager
@@ -104,6 +104,18 @@ class ClassroomService:
         stmt = stmt.order_by(Classroom.created_at.desc(), Classroom.id).limit(limit).offset(offset)
         return [(classroom, role) for classroom, role in (await self.db.execute(stmt)).all()]
 
+    async def count_for_user(self, user: User, *, include_archived: bool) -> int:
+        """Total classrooms the user is a member of (for the X-Total-Count header)."""
+        stmt = (
+            select(func.count())
+            .select_from(Classroom)
+            .join(ClassroomMember, ClassroomMember.classroom_id == Classroom.id)
+            .where(ClassroomMember.user_id == user.id)
+        )
+        if not include_archived:
+            stmt = stmt.where(Classroom.is_archived.is_(False))
+        return await self.db.scalar(stmt) or 0
+
     # ------------------------------------------------------------------ #
     # Update / delete
     # ------------------------------------------------------------------ #
@@ -176,24 +188,46 @@ class ClassroomService:
     # ------------------------------------------------------------------ #
     # People
     # ------------------------------------------------------------------ #
-    async def list_people(self, classroom: Classroom) -> ClassroomPeople:
-        """Teachers (owner first) and students (alphabetical) of a classroom."""
-        stmt = (
+    async def list_people(
+        self, classroom: Classroom, *, limit: int, offset: int
+    ) -> ClassroomPeople:
+        """All teachers (owner first) and one page of students (alphabetical)."""
+        active = (ClassroomMember.classroom_id == classroom.id, User.is_active.is_(True))
+        base = (
             select(ClassroomMember)
             .join(ClassroomMember.user)
             .options(contains_eager(ClassroomMember.user))
-            .where(ClassroomMember.classroom_id == classroom.id, User.is_active.is_(True))
-            .order_by(User.full_name, User.id)
+            .where(*active)
         )
-        members = (await self.db.scalars(stmt)).all()
+        teacher_rows = (
+            await self.db.scalars(base.where(ClassroomMember.role == MemberRole.TEACHER))
+        ).all()
+        student_rows = (
+            await self.db.scalars(
+                base.where(ClassroomMember.role == MemberRole.STUDENT)
+                .order_by(User.full_name, User.id)
+                .limit(limit)
+                .offset(offset)
+            )
+        ).all()
+        students_total = (
+            await self.db.scalar(
+                select(func.count())
+                .select_from(ClassroomMember)
+                .join(User, User.id == ClassroomMember.user_id)
+                .where(*active, ClassroomMember.role == MemberRole.STUDENT)
+            )
+            or 0
+        )
 
         owner_id: uuid.UUID = classroom.owner_id
         teachers = sorted(
-            (m for m in members if m.role == MemberRole.TEACHER),
-            key=lambda m: (m.user_id != owner_id, m.user.full_name.casefold()),
+            teacher_rows, key=lambda m: (m.user_id != owner_id, m.user.full_name.casefold())
         )
-        students = [m for m in members if m.role == MemberRole.STUDENT]
         return ClassroomPeople(
             teachers=[ClassroomMemberRead.model_validate(m) for m in teachers],
-            students=[ClassroomMemberRead.model_validate(m) for m in students],
+            students=[ClassroomMemberRead.model_validate(m) for m in student_rows],
+            students_total=students_total,
+            limit=limit,
+            offset=offset,
         )

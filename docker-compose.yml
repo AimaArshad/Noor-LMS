@@ -45,6 +45,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       RATE_LIMIT_STORAGE_URI: redis://redis:6379/1
       STORAGE_DIR: /app/storage
+      # Structured logging: JSON in production, readable text elsewhere ("auto")
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-auto}
     ports:
       - "8000:8000"
     depends_on:
@@ -53,7 +56,7 @@ services:
       redis:
         condition: service_healthy
     # Dev mode: hot reload. Remove --reload and the ./backend/app mount for production.
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --proxy-headers --no-server-header
     volumes:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic 
