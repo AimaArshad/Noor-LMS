@@ -64,8 +64,9 @@ export function QuizTimer({ expiresAt, skewMs, onExpire }: QuizTimerProps) {
         aria-live="off"
         aria-label="Time remaining"
         className={cn(
-          "flex items-center gap-2 font-mono text-lg font-semibold",
+          "flex items-center gap-2 font-mono text-lg font-semibold transition-colors",
           seconds <= 60 && "text-destructive",
+          seconds <= 30 && "animate-soft-pulse",
         )}
       >
         <Clock className="h-5 w-5" aria-hidden="true" />

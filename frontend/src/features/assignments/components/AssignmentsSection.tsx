@@ -21,14 +21,14 @@ function AssignmentItem({ assignment, classroom }: { assignment: Assignment; cla
   const attachments = assignment.attachments ?? [];
 
   return (
-    <Card>
+    <Card className="group transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
       <CardContent className="space-y-2 p-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="break-words font-medium">
               <Link
                 to={`/classes/${classroom.id}/assignments/${assignment.id}`}
-                className="underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="transition-colors underline-offset-4 hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {assignment.title}
               </Link>

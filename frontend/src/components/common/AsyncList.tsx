@@ -1,9 +1,10 @@
+import { Inbox } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { getErrorMessage } from "@/api/errors";
 import { ErrorAlert } from "@/components/common/ErrorAlert";
-import { Spinner } from "@/components/common/Spinner";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface AsyncListProps {
   isPending: boolean;
@@ -26,7 +27,16 @@ export function AsyncList({
   loadingLabel = "Loading…",
   children,
 }: AsyncListProps) {
-  if (isPending) return <Spinner label={loadingLabel} />;
+  if (isPending) {
+    return (
+      <div role="status" aria-live="polite" className="space-y-3">
+        <span className="sr-only">{loadingLabel}</span>
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
   if (error) {
     return (
       <div className="space-y-3">
@@ -39,7 +49,10 @@ export function AsyncList({
   }
   if (isEmpty) {
     return (
-      <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{emptyText}</p>
+      <div className="rounded-xl border border-dashed bg-card/60 p-8 text-center">
+        <Inbox className="mx-auto mb-2 h-6 w-6 text-muted-foreground" aria-hidden="true" />
+        <p className="text-sm text-muted-foreground">{emptyText}</p>
+      </div>
     );
   }
   return <>{children}</>;

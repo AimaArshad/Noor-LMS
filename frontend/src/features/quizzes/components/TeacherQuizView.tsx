@@ -27,7 +27,8 @@ export function TeacherQuizView({ quiz, classroom }: { quiz: TeacherQuiz; classr
         ← Back to classwork
       </Link>
 
-      <header className="space-y-2">
+      <header className="relative space-y-2 overflow-hidden rounded-xl border bg-card p-5 shadow-sm">
+        <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-brand" />
         <div className="flex flex-wrap items-start justify-between gap-2">
           <h2 className="break-words text-2xl font-semibold tracking-tight">{quiz.title}</h2>
           <div className="flex flex-wrap items-center gap-2">

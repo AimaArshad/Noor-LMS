@@ -22,7 +22,10 @@
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 85%;
   --ring: 221.2 83.2% 53.3%;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
+  /* Brand gradient endpoints (white text stays above 4.5:1 on both). */
+  --brand-from: 221.2 83.2% 53.3%;
+  --brand-to: 258 70% 50%;
 }
 
 .dark {
@@ -71,6 +74,8 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
 }
 
 @layer base {
@@ -79,5 +84,125 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(48rem 32rem at 6% -10%, hsl(var(--primary) / 0.1), transparent 60%),
+      radial-gradient(42rem 30rem at 100% -4%, hsl(258 70% 50% / 0.09), transparent 58%);
+    background-attachment: fixed;
+  }
+  .dark body {
+    background-image:
+      radial-gradient(48rem 32rem at 6% -10%, hsl(var(--primary) / 0.16), transparent 60%),
+      radial-gradient(42rem 30rem at 100% -4%, hsl(258 70% 50% / 0.14), transparent 58%);
+  }
+  /* The route root fades in once; classroom pages add their own keyed wrapper. */
+  #main-content > * {
+    animation: enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  ::selection {
+    background-color: hsl(var(--primary) / 0.2);
+  }
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes soft-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes dialog-in {
+  /* Only opacity + scale here: Tailwind's centering utilities use the separate
+     `translate` property, so re-declaring translate in the keyframes would offset
+     the dialog twice and push it off-screen. */
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@layer utilities {
+  .bg-brand {
+    background-image: linear-gradient(135deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+  }
+  .text-brand {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+  }
+  .animate-enter {
+    animation: enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-soft-pulse {
+    animation: soft-pulse 1.5s ease-in-out infinite;
+  }
+  .animate-fade {
+    animation: fade-in 0.2s ease-out both;
+  }
+  .animate-dialog {
+    animation: dialog-in 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .animate-slide-in {
+    animation: slide-in-right 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: hsl(var(--muted));
+  }
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background-image: linear-gradient(90deg, transparent, hsl(var(--background) / 0.65), transparent);
+    animation: shimmer 1.5s infinite;
+  }
+}
+
+/* Users who ask for less motion get the final state, instantly. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

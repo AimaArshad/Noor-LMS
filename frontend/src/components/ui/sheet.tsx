@@ -8,19 +8,19 @@ const Sheet = SheetPrimitive.Root;
 const SheetTrigger = SheetPrimitive.Trigger;
 const SheetClose = SheetPrimitive.Close;
 
-// NOTE: no `animate-in` / `animate-out` classes: those ship with `tailwindcss-animate`, which this
-// project does not install. The drawer slides in instantly, which also respects reduced motion.
+// Radix mounts the drawer only while it is open; the slide-in animation is defined in
+// index.css and is skipped for users who prefer reduced motion.
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <SheetPrimitive.Portal>
-    <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60" />
+    <SheetPrimitive.Overlay className="fixed inset-0 z-50 animate-fade bg-black/60" />
     <SheetPrimitive.Content
       ref={ref}
       aria-modal="true"
       className={cn(
-        "fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md flex-col gap-4 border-l bg-background p-6 shadow-lg",
+        "fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md animate-slide-in flex-col gap-4 border-l bg-background p-6 shadow-xl",
         className,
       )}
       {...props}

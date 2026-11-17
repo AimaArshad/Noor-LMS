@@ -39,7 +39,9 @@ export function ClassroomLayout() {
       <Announcer message={announcement} />
       <ClassroomHeader classroom={classroom} />
       <ClassroomTabs classroomId={classroom.id} />
-      <Outlet context={{ classroom }} />
+      <div key={location.pathname} className="animate-enter">
+        <Outlet context={{ classroom }} />
+      </div>
     </div>
   );
 }

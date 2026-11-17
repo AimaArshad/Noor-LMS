@@ -1,3 +1,4 @@
+import { Loader2, Play } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -85,7 +86,7 @@ export function StudentQuizView({ quiz, classroom }: { quiz: StudentQuiz; classr
       ) : null}
 
       {info ? (
-        <section aria-label="Your attempts" className="space-y-4 rounded-lg border p-4">
+        <section aria-label="Your attempts" className="space-y-4 rounded-xl border bg-card p-4 shadow-sm">
           {finished && attempt ? (
             <div className="space-y-1">
               <p className="font-medium">
@@ -115,14 +116,18 @@ export function StudentQuizView({ quiz, classroom }: { quiz: StudentQuiz; classr
 
           <ErrorAlert message={start.isError ? getErrorMessage(start.error) : null} />
           {info.can_start ? (
-            <Button disabled={start.isPending} onClick={onStart}>
-              {start.isPending
-                ? "Starting…"
-                : open
-                  ? "Resume quiz"
-                  : info.attempts_used > 0
-                    ? "Retake quiz"
-                    : "Start quiz"}
+            <Button size="lg" className="w-full sm:w-auto" disabled={start.isPending} onClick={onStart}>
+              {start.isPending ? (
+                <>
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                  Starting…
+                </>
+              ) : (
+                <>
+                  <Play aria-hidden="true" />
+                  {open ? "Resume quiz" : info.attempts_used > 0 ? "Retake quiz" : "Start quiz"}
+                </>
+              )}
             </Button>
           ) : null}
           {info.attempts_used > 0 ? (

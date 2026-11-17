@@ -19,8 +19,11 @@ export function ClassroomTabs({ classroomId }: { classroomId: string }) {
   const inClasswork = CLASSWORK_DETAIL.test(pathname);
 
   return (
-    <nav aria-label="Classroom sections" className="border-b">
-      <ul className="-mb-px flex gap-1 overflow-x-auto">
+    <nav
+      aria-label="Classroom sections"
+      className="w-fit max-w-full overflow-x-auto rounded-full border bg-muted/60 p-1"
+    >
+      <ul className="flex gap-1">
         {TABS.map(({ suffix, label, end }) => (
           <li key={label}>
             <NavLink
@@ -29,10 +32,10 @@ export function ClassroomTabs({ classroomId }: { classroomId: string }) {
               className={({ isActive }) => {
                 const active = label === "Classwork" ? isActive || inClasswork : isActive;
                 return cn(
-                  "block whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "block whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-[color,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   active
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground",
+                    ? "bg-background text-primary shadow-sm"
+                    : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
                 );
               }}
             >

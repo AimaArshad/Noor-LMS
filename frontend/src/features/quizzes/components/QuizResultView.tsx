@@ -17,13 +17,14 @@ export function QuizResultView({ quiz, attempt, onClose }: QuizResultViewProps) 
 
   return (
     <section aria-labelledby="result-title" className="space-y-6">
-      <header className="space-y-2 rounded-lg border p-4">
+      <header className="relative space-y-2 overflow-hidden rounded-xl border bg-card p-5 shadow-sm">
+        <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-brand" />
         <h2 id="result-title" className="text-lg font-semibold">
           Your result: {quiz.title}
         </h2>
         {hasScore ? (
           <p className="text-3xl font-semibold">
-            {formatPoints(attempt.score ?? 0)}
+            <span className="text-brand">{formatPoints(attempt.score ?? 0)}</span>
             <span className="text-lg font-normal text-muted-foreground">
               {" "}
               / {formatPoints(attempt.max_score ?? 0)}

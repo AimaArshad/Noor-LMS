@@ -74,7 +74,10 @@ function QuestionView({
   onChange: (next: Answer) => void;
 }) {
   return (
-    <fieldset disabled={disabled} className="space-y-4">
+    <fieldset
+      disabled={disabled}
+      className="animate-enter space-y-4 rounded-xl border bg-card p-5 shadow-sm sm:p-6"
+    >
       <legend className="space-y-1">
         <span className="block text-sm text-muted-foreground">
           Question {number} of {total} · {question.points} point{question.points === 1 ? "" : "s"}
@@ -96,8 +99,8 @@ function QuestionView({
             <label
               key={option.id}
               className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors hover:bg-accent/50 focus-within:ring-2 focus-within:ring-ring",
-                answer?.optionId === option.id && "border-primary bg-primary/5",
+                "flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 text-sm transition-[background-color,border-color,box-shadow] duration-150 hover:border-primary/40 hover:bg-accent/60 focus-within:ring-2 focus-within:ring-ring",
+                answer?.optionId === option.id && "border-primary bg-primary/10 shadow-sm ring-1 ring-primary/30",
               )}
             >
               <input
@@ -194,12 +197,25 @@ export function QuizTaker({ session, onSubmitted, onAbort }: QuizTakerProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-sm">
         <div>
           <h2 className="text-lg font-semibold">{quiz.title}</h2>
           <p className="text-sm text-muted-foreground">
             {answeredCount} of {questions.length} answered
           </p>
+          <div
+            role="progressbar"
+            aria-label="Questions answered"
+            aria-valuemin={0}
+            aria-valuemax={questions.length}
+            aria-valuenow={answeredCount}
+            className="mt-2 h-2 w-40 overflow-hidden rounded-full bg-muted"
+          >
+            <div
+              className="h-full rounded-full bg-brand transition-[width] duration-300"
+              style={{ width: `${(answeredCount / questions.length) * 100}%` }}
+            />
+          </div>
         </div>
         {session.expiresAt ? (
           <QuizTimer expiresAt={session.expiresAt} skewMs={session.skewMs} onExpire={send} />
@@ -256,9 +272,9 @@ export function QuizTaker({ session, onSubmitted, onAbort }: QuizTakerProps) {
                     aria-current={i === index ? "step" : undefined}
                     onClick={() => setIndex(i)}
                     className={cn(
-                      "h-10 w-full rounded-md border text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      answered ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground",
-                      i === index && "ring-2 ring-primary",
+                      "h-10 w-full rounded-lg border bg-card text-sm font-medium transition-[transform,background-color,border-color,box-shadow] duration-150 hover:border-primary/50 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      answered ? "border-primary/50 bg-primary/10 text-primary" : "text-muted-foreground",
+                      i === index && "ring-2 ring-primary ring-offset-1",
                     )}
                   >
                     {i + 1}

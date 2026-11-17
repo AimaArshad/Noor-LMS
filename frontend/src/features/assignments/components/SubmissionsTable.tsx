@@ -192,7 +192,7 @@ export function SubmissionsTable({ assignment, readOnly }: { assignment: Assignm
         emptyText="Nobody has turned in work yet."
         loadingLabel="Loading submissions…"
       >
-        <div className="overflow-x-auto rounded-lg border">
+        <div className="relative overflow-x-auto rounded-lg border">
           <table className="w-full text-left text-sm">
             <caption className="sr-only">Student submissions for {assignment.title}</caption>
             <thead className="bg-muted/50 text-muted-foreground">
