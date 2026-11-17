@@ -1,8 +1,11 @@
 import { Outlet } from "react-router-dom";
 
 import { TopNav } from "@/components/layout/TopNav";
+import { useNotificationSocket } from "@/features/notifications/useNotificationSocket";
 
 export function AppLayout() {
+  useNotificationSocket(); // one live notifications socket per signed-in tab
+
   return (
     <div className="min-h-screen bg-background">
       <a

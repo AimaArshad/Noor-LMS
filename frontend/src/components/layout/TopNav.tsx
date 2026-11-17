@@ -2,6 +2,7 @@ import { GraduationCap, Home, ListTodo, LogOut, Shield, User as UserIcon, type L
 import { Link, NavLink } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth";
 
@@ -65,7 +66,8 @@ export function TopNav() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <NotificationBell />
           {user ? (
             <span className="hidden items-center gap-2 sm:flex">
               <span

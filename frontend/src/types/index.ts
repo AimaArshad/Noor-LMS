@@ -174,3 +174,18 @@ export type Material = components["schemas"]["MaterialRead"];
 export type MaterialCreateInput = Omit<components["schemas"]["MaterialCreate"], "description"> & {
   description?: string;
 };
+
+// --- Step 17: to-do list, notifications ------------------------------------------------
+
+export type TodoRefType = components["schemas"]["TodoRefType"];
+/** One to-do entry: an explicit personal item or work derived from an assignment/quiz. */
+export type TodoItem = components["schemas"]["TodoRead"];
+/** A page of to-dos plus counters over ALL of the user's items. */
+export type TodoList = components["schemas"]["TodoList"];
+
+/** Named `AppNotification` so it does not shadow the DOM `Notification` class. */
+export type AppNotification = components["schemas"]["NotificationRead"];
+/** Same shape over REST and in WebSocket `notification` messages. */
+export type NotificationPage = components["schemas"]["NotificationPage"];
+/** Response of POST /notifications/read-all. */
+export type ReadAllResult = components["schemas"]["ReadAllResult"];

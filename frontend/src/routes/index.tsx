@@ -16,9 +16,10 @@ import { LoginPage } from "@/pages/Login";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 import { ProfilePage } from "@/pages/ProfilePage";
 import { RegisterPage } from "@/pages/Register";
-import { TodoPage } from "@/pages/TodoPage";
+import { TodoPage } from "@/pages/Todo";
 import { GuestRoute } from "@/routes/GuestRoute";
 import { ClassroomsRedirect } from "@/routes/ClassroomsRedirect";
+import { MaterialRedirect } from "@/routes/MaterialRedirect";
 import { ProtectedRoute } from "@/routes/ProtectedRoute";
 import { RoleRoute } from "@/routes/RoleRoute";
 
@@ -54,6 +55,7 @@ export const router = createBrowserRouter(
                 { path: "people", element: <PeoplePage /> },
                 { path: "grades", element: <GradesPage /> },
                 { path: "assignments/:assignmentId", element: <AssignmentPage /> },
+                { path: "materials/:materialId", element: <MaterialRedirect /> },
                 { path: "quizzes/new", element: <QuizBuilderPage /> },
                 { path: "quizzes/:quizId", element: <QuizPage /> },
               ],
