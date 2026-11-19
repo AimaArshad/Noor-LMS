@@ -8,3 +8,8 @@ venv/
 .mypy_cache/
 storage/*
 !storage/.gitkeep
+
+# TTS voice models & cache (large binary files, downloaded at build time)
+voices/
+tts_cache/
+*.onnx

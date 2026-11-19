@@ -45,6 +45,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       RATE_LIMIT_STORAGE_URI: redis://redis:6379/1
       STORAGE_DIR: /app/storage
+      # TTS (tts_cache must NOT be under STORAGE_DIR — the dev static mount serves that)
+      PIPER_VOICES_DIR: /app/voices
+      TTS_CACHE_DIR: /app/tts_cache
       # Structured logging: JSON in production, readable text elsewhere ("auto")
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: ${LOG_FORMAT:-auto}
@@ -61,6 +64,40 @@ services:
       - ./backend/app:/app/app
       - ./backend/alembic:/app/alembic 
       - storage_data:/app/storage
+      - piper_voices:/app/voices
+      - tts_cache:/app/tts_cache
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: educonnect-worker
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://educonnect:educonnect@postgres:5432/educonnect
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/2
+      RATE_LIMIT_STORAGE_URI: redis://redis:6379/1
+      STORAGE_DIR: /app/storage
+      PIPER_VOICES_DIR: /app/voices
+      TTS_CACHE_DIR: /app/tts_cache
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-auto}
+      # Skip DB migrations on worker startup — the backend service runs them.
+      RUN_MIGRATIONS: "false"
+    command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/app:/app/app
+      - storage_data:/app/storage
+      - piper_voices:/app/voices
+      - tts_cache:/app/tts_cache
 
   frontend:
     build:
@@ -85,3 +122,5 @@ volumes:
   postgres_data:
   redis_data:
   storage_data:
+  piper_voices:
+  tts_cache:
