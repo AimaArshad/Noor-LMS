@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     PIPER_DEFAULT_VOICE: str = "en_US-lessac-medium"
     #: Disk cache directory for synthesised audio (must NOT be under STORAGE_DIR).
     TTS_CACHE_DIR: Path = Path("./tts_cache")
+    #: Per-IP rate limit for POST /accessibility/tts (slowapi syntax).
+    TTS_RATE_LIMIT: str = "20/minute"
+
+    # ---- Celery ----
+    #: Broker URL for Celery (defaults to the same Redis instance as REDIS_URL).
+    CELERY_BROKER_URL: str = "redis://localhost:6379/2"
 
     # ---- Per-IP limits for /auth/* (slowapi syntax, e.g. "10/minute") ----
     AUTH_RATE_LIMIT_REGISTER: str = "5/minute"
@@ -86,6 +92,7 @@ class Settings(BaseSettings):
         "AUTH_RATE_LIMIT_REFRESH",
         "AUTH_RATE_LIMIT_LOGOUT",
         "AUTH_RATE_LIMIT_ME",
+        "TTS_RATE_LIMIT",
     )
     @classmethod
     def _validate_rate_limit(cls, value: str) -> str:

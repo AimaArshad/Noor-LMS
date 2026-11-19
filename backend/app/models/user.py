@@ -12,6 +12,7 @@ from app.models._helpers import pg_enum
 from app.models.enums import UserRole
 
 if TYPE_CHECKING:
+    from app.models.accessibility import UserAccessibilitySettings
     from app.models.classroom import Classroom, ClassroomMember
     from app.models.assignment import Submission
     from app.models.notification import Notification
@@ -64,6 +65,12 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     todo_items: Mapped[list[TodoItem]] = relationship(
         back_populates="user", cascade="all, delete-orphan", passive_deletes=True
+    )
+    accessibility_settings: Mapped[UserAccessibilitySettings | None] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
     )
 
     def __repr__(self) -> str:

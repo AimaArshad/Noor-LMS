@@ -7,6 +7,7 @@ from app.models import Base
 
 EXPECTED_TABLES = {
     "users",
+    "user_accessibility_settings",
     "classrooms",
     "classroom_members",
     "announcements",

@@ -86,6 +86,10 @@ OPENAPI_TAGS = [
         "name": "accessibility",
         "description": "Text-to-speech synthesis and voice listing for screen-reader users.",
     },
+    {
+        "name": "users",
+        "description": "User profile and per-user accessibility preferences.",
+    },
 ]
 
 _ERROR_JSON = {"model": ErrorResponse}

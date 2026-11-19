@@ -14,6 +14,7 @@ from app.models.enums import (
     UserRole,
 )
 from app.models.user import User
+from app.models.accessibility import UserAccessibilitySettings
 from app.models.classroom import Classroom, ClassroomMember, generate_join_code
 from app.models.announcement import Announcement
 from app.models.assignment import Assignment, Submission
@@ -51,5 +52,6 @@ __all__ = [
     "Submission",
     "TodoItem",
     "User",
+    "UserAccessibilitySettings",
     "generate_join_code",
 ]

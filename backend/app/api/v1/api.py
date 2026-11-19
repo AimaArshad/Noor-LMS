@@ -14,6 +14,7 @@ from app.api.v1.routers import (
     notifications,
     quizzes,
     todo,
+    users,
 )
 
 api_router = APIRouter()
@@ -58,6 +59,7 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(
     accessibility.router, prefix="/accessibility", tags=["accessibility"]
 )
+api_router.include_router(users.router, prefix="/users", tags=["users"])
 
 # Later steps:
 # api_router.include_router(users.router, prefix="/users", tags=["users"])
