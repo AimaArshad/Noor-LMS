@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.routers import (
+    accessibility,
     announcements,
     assignments,
     auth,
@@ -54,6 +55,9 @@ api_router.include_router(comments.router, prefix="/comments", tags=["comments"]
 api_router.include_router(files.router, prefix="/files", tags=["files"])
 api_router.include_router(todo.router, prefix="/todo", tags=["todo"])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+api_router.include_router(
+    accessibility.router, prefix="/accessibility", tags=["accessibility"]
+)
 
 # Later steps:
 # api_router.include_router(users.router, prefix="/users", tags=["users"])

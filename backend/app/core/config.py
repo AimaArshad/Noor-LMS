@@ -59,6 +59,16 @@ class Settings(BaseSettings):
     #: auto = JSON in production/staging, readable text elsewhere
     LOG_FORMAT: Literal["auto", "json", "text"] = "auto"
 
+    # ---- TTS (Text-to-Speech) ----
+    #: Provider selection: auto tries piper → espeak; "piper"/"local" force one.
+    TTS_PROVIDER: Literal["auto", "piper", "local"] = "auto"
+    #: Directory containing Piper .onnx + .onnx.json voice model files.
+    PIPER_VOICES_DIR: Path = Path("./voices")
+    #: Default Piper voice (file stem, e.g. "en_US-lessac-medium").
+    PIPER_DEFAULT_VOICE: str = "en_US-lessac-medium"
+    #: Disk cache directory for synthesised audio (must NOT be under STORAGE_DIR).
+    TTS_CACHE_DIR: Path = Path("./tts_cache")
+
     # ---- Per-IP limits for /auth/* (slowapi syntax, e.g. "10/minute") ----
     AUTH_RATE_LIMIT_REGISTER: str = "5/minute"
     AUTH_RATE_LIMIT_LOGIN: str = "10/minute"

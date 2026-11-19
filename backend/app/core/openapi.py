@@ -82,6 +82,10 @@ OPENAPI_TAGS = [
         "name": "notifications",
         "description": "In-app notifications. Live delivery uses the WebSocket.",
     },
+    {
+        "name": "accessibility",
+        "description": "Text-to-speech synthesis and voice listing for screen-reader users.",
+    },
 ]
 
 _ERROR_JSON = {"model": ErrorResponse}
