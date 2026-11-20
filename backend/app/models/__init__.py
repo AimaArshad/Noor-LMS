@@ -13,6 +13,7 @@ from app.models.enums import (
     TodoRefType,
     UserRole,
 )
+from app.models.audiobook_enums import AudiobookStatus, SegmentStatus
 from app.models.user import User
 from app.models.accessibility import UserAccessibilitySettings
 from app.models.classroom import Classroom, ClassroomMember, generate_join_code
@@ -24,26 +25,33 @@ from app.models.file import File
 from app.models.comment import Comment
 from app.models.notification import Notification
 from app.models.todo import TodoItem
+from app.models.audiobook import Audiobook, AudiobookSection, AudiobookSegment, PlaybackProgress
 
 __all__ = [
     "Base",
     # enums
     "AssignmentState",
+    "AudiobookStatus",
     "CommentTarget",
     "MemberRole",
     "QuestionType",
+    "SegmentStatus",
     "SubmissionState",
     "TodoRefType",
     "UserRole",
     # models
     "Announcement",
     "Assignment",
+    "Audiobook",
+    "AudiobookSection",
+    "AudiobookSegment",
     "Classroom",
     "ClassroomMember",
     "Comment",
     "File",
     "Material",
     "Notification",
+    "PlaybackProgress",
     "Quiz",
     "QuizAnswer",
     "QuizAttempt",

@@ -23,6 +23,11 @@ EXPECTED_TABLES = {
     "comments",
     "notifications",
     "todo_items",
+    # Audiobook feature
+    "audiobooks",
+    "audiobook_sections",
+    "audiobook_segments",
+    "playback_progress",
 }
 
 
