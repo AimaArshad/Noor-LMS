@@ -6,6 +6,7 @@ from app.api.v1.routers import (
     accessibility,
     announcements,
     assignments,
+    audiobooks,
     auth,
     classrooms,
     comments,
@@ -60,6 +61,9 @@ api_router.include_router(
     accessibility.router, prefix="/accessibility", tags=["accessibility"]
 )
 api_router.include_router(users.router, prefix="/users", tags=["users"])
-
-# Later steps:
-# api_router.include_router(users.router, prefix="/users", tags=["users"])
+api_router.include_router(
+    audiobooks.classroom_router,
+    prefix="/classrooms/{classroom_id}/audiobooks",
+    tags=["audiobooks"],
+)
+api_router.include_router(audiobooks.audiobook_router, prefix="/audiobooks", tags=["audiobooks"])

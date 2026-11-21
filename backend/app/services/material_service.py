@@ -107,6 +107,11 @@ class MaterialService:
         )
         await self.db.commit()
         await self.db.refresh(material)  # server-generated timestamps
+
+        # Auto-create audiobooks for PDF/DOCX/TXT attachments (never fails the request)
+        await self._auto_create_audiobooks(classroom, user, attachments)
+        await self.db.refresh(material)  # a rolled-back audiobook insert expires loaded rows
+
         return material
 
     async def update(
@@ -125,10 +130,16 @@ class MaterialService:
             material.attachments = await self._resolve_attachments(
                 user, data.attachments, material.attachments
             )
+
         for field, value in changes.items():
             setattr(material, field, value)
         await self.db.commit()
         await self.db.refresh(material)
+
+        # Only after the material is safely saved: auto-create audiobooks for its files
+        if data.attachments is not None:
+            await self._auto_create_audiobooks(classroom, user, material.attachments)
+            await self.db.refresh(material)
         return material
 
     async def delete(self, classroom: Classroom, material: Material) -> None:
@@ -136,3 +147,38 @@ class MaterialService:
         ensure_not_archived(classroom.is_archived)
         await self.db.delete(material)
         await self.db.commit()
+
+    # ------------------------------------------------------------------ #
+    # Audiobook auto-creation (idempotent, never raises)
+    # ------------------------------------------------------------------ #
+
+    async def _auto_create_audiobooks(
+        self,
+        classroom: Classroom,
+        user: User,
+        attachments: list[dict[str, Any]],
+    ) -> None:
+        """For each attachment, idempotently create an audiobook row + enqueue the build."""
+        from app.services.audiobook_service import AudiobookService
+
+        try:
+            svc = AudiobookService(self.db)
+            for att in attachments:
+                try:
+                    file_id = uuid.UUID(str(att["file_id"]))
+                    await svc.auto_create_from_material(
+                        classroom, file_id, "", created_by=user.id,
+                        file_name=att.get("name", "") or att.get("original_name", ""),
+                    )
+                except Exception:  # noqa: BLE001
+                    await self.db.rollback()  # a failed insert must not poison the session
+        except Exception:  # noqa: BLE001
+            await self.db.rollback()
+
+
+
+
+
+
+
+

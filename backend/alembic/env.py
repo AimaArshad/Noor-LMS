@@ -32,6 +32,12 @@ def get_url() -> str:
     override = context.get_x_argument(as_dictionary=True).get("db_url")
     return override or settings.DATABASE_URL
 
+def include_object(obj, name, type_, reflected, compare_to):
+    # Created via raw SQL in the audiobook migration (expression index on
+    # to_tsvector); not representable on the model, so Alembic must not drop it.
+    if type_ == "index" and name == "ix_audiobook_segments_text_fts":
+        return False
+    return True
 
 def run_migrations_offline() -> None:
     """Generate SQL without a DB connection (``alembic upgrade head --sql``)."""
@@ -41,6 +47,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
+        include_object=include_object,  
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -53,7 +60,7 @@ def do_run_migrations(connection: Connection) -> None:
         target_metadata=target_metadata,
         compare_type=True,  # detect column type changes
         # compare_server_default=True,  # enable if you want server-default drift detection
-    )
+           include_object=include_object, )
     with context.begin_transaction():
         context.run_migrations()
 

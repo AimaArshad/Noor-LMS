@@ -35,6 +35,7 @@ celery_app = Celery(
     backend=None,
     include=[
         "app.worker.tasks.system",
+        "app.worker.audiobook_tasks",
     ],
 )
 

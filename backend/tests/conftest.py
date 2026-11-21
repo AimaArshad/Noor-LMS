@@ -1,6 +1,7 @@
 """Shared fixtures: isolated test DB, in-memory fake Redis, ASGI test client."""
 
 import os
+from sqlalchemy import text
 
 # Must run BEFORE any `app.*` import. The DATABASE_URL is forced (not setdefault) so tests
 # can never touch your dev database.
@@ -13,6 +14,12 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ.setdefault("JWT_SECRET", "test-secret-test-secret-test-secret-1234567890")
 os.environ["RATE_LIMIT_DEFAULT"] = "100000/minute"
 os.environ["RATE_LIMIT_STORAGE_URI"] = "memory://"
+
+
+import tempfile
+_TMP = tempfile.mkdtemp(prefix="educonnect_test_")
+os.environ["STORAGE_DIR"] = os.path.join(_TMP, "storage")
+os.environ["TTS_CACHE_DIR"] = os.path.join(_TMP, "tts_cache")
 
 from collections.abc import AsyncIterator  # noqa: E402
 
@@ -48,13 +55,17 @@ class FakeRedis:
 async def engine():  # noqa: ANN201
     """Fresh schema per test, dropped afterwards."""
     eng = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+
     async with eng.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield eng
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await eng.dispose()
+
+
 
 
 @pytest_asyncio.fixture

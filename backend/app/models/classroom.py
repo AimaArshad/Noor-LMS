@@ -18,6 +18,7 @@ from app.models.enums import MemberRole
 if TYPE_CHECKING:
     from app.models.announcement import Announcement
     from app.models.assignment import Assignment
+    from app.models.audiobook import Audiobook
     from app.models.material import Material
     from app.models.quiz import Quiz
     from app.models.user import User
@@ -72,6 +73,9 @@ class Classroom(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="classroom", cascade="all, delete-orphan", passive_deletes=True
     )
     materials: Mapped[list[Material]] = relationship(
+        back_populates="classroom", cascade="all, delete-orphan", passive_deletes=True
+    )
+    audiobooks: Mapped[list[Audiobook]] = relationship(
         back_populates="classroom", cascade="all, delete-orphan", passive_deletes=True
     )
 

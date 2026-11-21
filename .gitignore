@@ -9,6 +9,8 @@ venv/
 storage/*
 !storage/.gitkeep
 
+backend/storage/*
+
 # TTS voice models & cache (large binary files, downloaded at build time)
 voices/
 tts_cache/

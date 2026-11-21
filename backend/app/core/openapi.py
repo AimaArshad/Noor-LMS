@@ -90,6 +90,10 @@ OPENAPI_TAGS = [
         "name": "users",
         "description": "User profile and per-user accessibility preferences.",
     },
+    {
+        "name": "audiobooks",
+        "description": "Audiobook creation, manifest, segment audio, search and playback progress.",
+    },
 ]
 
 _ERROR_JSON = {"model": ErrorResponse}

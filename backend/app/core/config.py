@@ -75,6 +75,14 @@ class Settings(BaseSettings):
     #: Broker URL for Celery (defaults to the same Redis instance as REDIS_URL).
     CELERY_BROKER_URL: str = "redis://localhost:6379/2"
 
+    # ---- Audiobook ----
+    #: Minimum segment size in characters (soft lower bound for packing).
+    AUDIOBOOK_SEGMENT_MIN_CHARS: int = Field(default=800, gt=0)
+    #: Maximum segment size in characters (hard upper bound).
+    AUDIOBOOK_SEGMENT_MAX_CHARS: int = Field(default=1500, gt=0)
+    #: Number of concurrent synthesis workers in the Celery worker process.
+    AUDIOBOOK_BUILD_CONCURRENCY: int = Field(default=2, gt=0)
+
     # ---- Per-IP limits for /auth/* (slowapi syntax, e.g. "10/minute") ----
     AUTH_RATE_LIMIT_REGISTER: str = "5/minute"
     AUTH_RATE_LIMIT_LOGIN: str = "10/minute"
