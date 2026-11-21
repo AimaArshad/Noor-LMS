@@ -51,8 +51,17 @@ celery_app.conf.update(
     # hard sends SIGKILL after an additional 30 s.
     task_soft_time_limit=300,   # 5 minutes
     task_time_limit=330,        # 5 minutes + 30 s grace
+    # Broker: keep unacknowledged tasks visible for 12 h (longer than the audiobook task limit)
+    broker_transport_options={"visibility_timeout": 43200},
     # Timezone
     timezone="UTC",
     enable_utc=True,
+    # Per-task overrides: audiobook.build can run for up to 6 hours
+    task_annotations={
+        "audiobook.build": {
+            "soft_time_limit": 21600,  # 6 hours
+            "time_limit": 21900,       # 6 hours + 5 min grace
+        }
+    },
 )
 

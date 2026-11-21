@@ -20,6 +20,7 @@ import tempfile
 _TMP = tempfile.mkdtemp(prefix="educonnect_test_")
 os.environ["STORAGE_DIR"] = os.path.join(_TMP, "storage")
 os.environ["TTS_CACHE_DIR"] = os.path.join(_TMP, "tts_cache")
+os.environ["AUDIOBOOK_AUDIO_DIR"] = os.path.join(_TMP, "audiobooks")
 
 from collections.abc import AsyncIterator  # noqa: E402
 

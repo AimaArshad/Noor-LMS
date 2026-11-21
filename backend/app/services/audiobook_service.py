@@ -15,9 +15,9 @@ The heavy pipeline work (extraction → synthesis) is done by the Celery task
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import pathlib
+import shutil
 import uuid
 from typing import Any
 
@@ -63,26 +63,34 @@ AUDIOBOOK_MIMES = {
 # helpers
 # ---------------------------------------------------------------------------
 
-def _tts_cache_key_for(text_body: str, voice: str) -> str:
-    """Deterministic cache key matching TTSService._cache_key logic.
+def _ab_audio_dir(ab_id: uuid.UUID) -> pathlib.Path:
+    """Directory that holds all synthesised MP3s for one audiobook."""
+    return settings.AUDIOBOOK_AUDIO_DIR / str(ab_id)
 
-    Uses provider 'piper' (the preferred provider) so that caching is
-    consistent with what the pipeline writes.  If a different provider was
-    used the key will simply miss and the audio file won't be found — that is
-    safe (404 → not_ready), not corrupt.
+
+# def _resolve_audio_path(audio_key: str) -> pathlib.Path:
+#     """Resolve relative ``audio_key`` against AUDIOBOOK_AUDIO_DIR.
+
+#     Rejects path traversal attempts (e.g. ``../../etc/passwd``).
+#     Raises ``ValueError`` if the resolved path escapes the base directory.
+#     """
+#     base = settings.AUDIOBOOK_AUDIO_DIR.resolve()
+#     p = (base / audio_key).resolve()
+#     if not str(p).startswith(str(base) + ("/" if str(base)[-1] != "/" else "")):
+#         raise ValueError(f"Path traversal rejected: {audio_key!r}")
+#     return p
+
+def _resolve_audio_path(audio_key: str) -> pathlib.Path:
+    """Resolve relative ``audio_key`` against AUDIOBOOK_AUDIO_DIR.
+
+    Rejects path traversal attempts (e.g. ``../../etc/passwd``).
+    Raises ``ValueError`` if the resolved path escapes the base directory.
     """
-    raw = f"piper|{voice}|{text_body}"
-    return hashlib.sha256(raw.encode()).hexdigest()
-
-
-def _cache_path(key: str) -> pathlib.Path:
-    return settings.TTS_CACHE_DIR / key[:2] / f"{key}.mp3"
-
-
-def _audio_key_for(text_body: str, voice: str) -> str:
-    """The ``audio_key`` stored in DB and used to locate the cached MP3."""
-    return _tts_cache_key_for(text_body, voice)
-
+    base = pathlib.Path(settings.AUDIOBOOK_AUDIO_DIR).resolve()
+    p = (base / audio_key).resolve()
+    if not p.is_relative_to(base):          # works on Windows and Linux
+        raise ValueError(f"Path traversal rejected: {audio_key!r}")
+    return p
 
 # ---------------------------------------------------------------------------
 # AudiobookService
@@ -244,8 +252,15 @@ class AudiobookService:
     # ------------------------------------------------------------------ #
 
     async def rebuild(self, audiobook_id: uuid.UUID, user: User) -> Audiobook:
+        from app.services.guards import ensure_not_archived
+
         ab = await self._get_audiobook(audiobook_id)
+        classroom = await self.db.get(Classroom, ab.classroom_id)
+        if classroom is not None:
+            ensure_not_archived(classroom.is_archived)
         await self._assert_teacher_access(ab, user)
+        # Clear any previously synthesised audio so the worker starts fresh
+        shutil.rmtree(_ab_audio_dir(ab.id), ignore_errors=True)
         ab.status = AudiobookStatus.QUEUED
         ab.error = None
         await self.db.commit()
@@ -254,28 +269,16 @@ class AudiobookService:
         return ab
 
     async def delete(self, audiobook_id: uuid.UUID, user: User) -> None:
+        from app.services.guards import ensure_not_archived
+
         ab = await self._get_audiobook(audiobook_id)
+        classroom = await self.db.get(Classroom, ab.classroom_id)
+        if classroom is not None:
+            ensure_not_archived(classroom.is_archived)
         await self._assert_teacher_access(ab, user)
 
-        # Best-effort delete of cached audio files owned by this book
-        voice = ab.voice or settings.PIPER_DEFAULT_VOICE
-        segs = (
-            await self.db.scalars(
-                select(AudiobookSegment)
-                .where(
-                    AudiobookSegment.audiobook_id == ab.id,
-                    AudiobookSegment.audio_key.isnot(None),
-                )
-            )
-        ).all()
-        for seg in segs:
-            if seg.audio_key:
-                p = _cache_path(seg.audio_key)
-                try:
-                    if p.exists():
-                        p.unlink()
-                except Exception:  # noqa: BLE001
-                    pass
+        # Best-effort delete of the whole audio directory for this book
+        shutil.rmtree(_ab_audio_dir(ab.id), ignore_errors=True)
 
         await self.db.delete(ab)
         await self.db.commit()
@@ -466,7 +469,17 @@ class AudiobookService:
                 detail={"code": "not_ready", "message": "Segment audio is not ready yet"},
             )
 
-        p = _cache_path(seg.audio_key)
+        try:
+            p = _resolve_audio_path(seg.audio_key)
+        except ValueError:
+            # raise HTTPException(
+            #     status.HTTP_404_NOT_FOUND,
+            #     detail={"code": "not_found", "message": "Segment not found"},
+            # )
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND,
+                detail={"code": "not_found", "message": "Invalid audio path"},
+            )
         if not p.is_file():
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND,
@@ -603,6 +616,3 @@ class AudiobookService:
                 )
             )
         return hits
-
-
-        

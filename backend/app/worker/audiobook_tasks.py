@@ -26,11 +26,10 @@ passing a different callable to the pipeline without touching this file.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import logging
 import pathlib
+import subprocess
 import uuid
-import wave
 
 from celery import Task
 from celery.utils.log import get_task_logger
@@ -51,58 +50,66 @@ def _get_sync_session():  # noqa: ANN202
     global _SyncSessionFactory  # noqa: PLW0603
     if _SyncSessionFactory is None:
         from sqlalchemy import create_engine
+        from sqlalchemy.engine import make_url
         from sqlalchemy.orm import sessionmaker
 
         from app.core.config import settings
 
-        sync_url = settings.DATABASE_URL.replace("+asyncpg", "")
+        sync_url = make_url(settings.DATABASE_URL).set(drivername="postgresql+psycopg2")
         engine = create_engine(sync_url, pool_pre_ping=True, pool_size=2, max_overflow=4)
         _SyncSessionFactory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
     return _SyncSessionFactory()
 
 
 # ---------------------------------------------------------------------------
-# TTS cache helpers (mirror TTSService logic exactly)
+# Audio directory helpers
 # ---------------------------------------------------------------------------
 
-def _tts_cache_key(text: str, voice: str, provider: str) -> str:
-    raw = f"{provider}|{voice}|{text}"
-    return hashlib.sha256(raw.encode()).hexdigest()
-
-
-def _tts_cache_path(key: str) -> pathlib.Path:
+def _audio_dir(ab_id: uuid.UUID) -> pathlib.Path:
+    """Return the directory that holds all MP3 segments for one audiobook."""
     from app.core.config import settings
 
-    return settings.TTS_CACHE_DIR / key[:2] / f"{key}.mp3"
+    return settings.AUDIOBOOK_AUDIO_DIR / str(ab_id)
+
+
+def _segment_audio_path(ab_id: uuid.UUID, seq: int) -> pathlib.Path:
+    """Absolute path to the MP3 file for segment *seq* of *ab_id*."""
+    return _audio_dir(ab_id) / f"{seq}.mp3"
+
+
+def _audio_key(ab_id: uuid.UUID, seq: int) -> str:
+    """Relative path stored in ``AudiobookSegment.audio_key``."""
+    return f"{ab_id}/{seq}.mp3"
 
 
 # ---------------------------------------------------------------------------
-# MP3 duration estimation
+# MP3 duration via ffprobe
 # ---------------------------------------------------------------------------
 
-def _mp3_duration_ms(mp3_bytes: bytes) -> int:
-    """Estimate MP3 duration in milliseconds from bitrate and size."""
-    _BITRATE = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0]
-    for i in range(min(len(mp3_bytes) - 3, 8192)):
-        if mp3_bytes[i] != 0xFF or (mp3_bytes[i + 1] & 0xE0) != 0xE0:
-            continue
-        br_idx = (mp3_bytes[i + 2] >> 4) & 0x0F
-        sr_idx = (mp3_bytes[i + 2] >> 2) & 0x03
-        bitrate = _BITRATE[br_idx] * 1000
-        sr_table = [44100, 48000, 32000, 0]
-        samplerate = sr_table[sr_idx]
-        if bitrate and samplerate:
-            return int(len(mp3_bytes) * 8 / bitrate * 1000)
-    return int(len(mp3_bytes) * 8 / 128000 * 1000)
+def _ffprobe_duration_ms(path: pathlib.Path, text_len: int) -> int:
+    """Return segment duration in milliseconds.
 
-
-# ---------------------------------------------------------------------------
-# File reading (sync, direct filesystem access)
-# ---------------------------------------------------------------------------
-
-def _read_file_bytes(path: pathlib.Path) -> bytes:
-    with open(path, "rb") as fh:
-        return fh.read()
+    Uses ffprobe when available; falls back to ``len(text) / 15`` seconds
+    (a rough 15 chars/s speaking-rate estimate) if ffprobe fails.
+    Never raises.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=nw=1:nk=1",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return int(float(result.stdout.strip()) * 1000)
+    except Exception:  # noqa: BLE001
+        pass
+    return int(text_len / 15 * 1000)
 
 
 # ---------------------------------------------------------------------------
@@ -116,16 +123,12 @@ def _extract_book(file_bytes: bytes, mime_type: str):  # noqa: ANN202
     return asyncio.run(extract_structure(file_bytes, mime_type))
 
 
-def _synthesise_text(text: str, voice: str) -> bytes:
-    """Synthesise one text segment and return MP3 bytes.
+def _synthesise_segment(tts, text: str, voice: str) -> bytes:
+    """Synthesise one text segment using a pre-built TTSService; return MP3 bytes.
 
-    Checks the TTS disk cache first (same key logic as TTSService), so
-    re-runs of the pipeline do not re-generate already-cached audio.
     Uses a fresh event loop per call (safe in a sync Celery worker).
+    TTSService handles its own disk cache, so re-runs skip already-cached audio.
     """
-    from app.services.tts_service import TTSService, build_providers
-
-    tts = TTSService(providers=build_providers())
     return asyncio.run(tts.synthesize(text, voice=voice))
 
 
@@ -141,7 +144,7 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
     from app.models.file import File
     from app.services.segmenter import SegmentDraft, build_segments
     from app.services.structure_extraction import ExtractionError
-    from app.services.tts_service import TTSProviderError
+    from app.services.tts_service import TTSProviderError, TTSService, build_providers
 
     ab_id = uuid.UUID(audiobook_id_str)
     db = _get_sync_session()
@@ -272,8 +275,10 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
         ab.status = AudiobookStatus.SYNTHESIZING
         db.commit()
 
-        # 7. Synthesise in order
+        # 7. Synthesise in order — build TTSService ONCE per task run (bug 4)
         voice = ab.voice or settings.PIPER_DEFAULT_VOICE
+        tts = TTSService(providers=build_providers())
+
         db_segs = (
             db.query(AudiobookSegment)
             .filter(AudiobookSegment.audiobook_id == ab_id)
@@ -282,14 +287,13 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
         )
 
         for db_seg in db_segs:
-            # Idempotent: skip if already ready AND cache file exists
+            # Idempotent: skip if already ready AND the MP3 file exists on disk
             if db_seg.status == SegmentStatus.READY and db_seg.audio_key:
-                p = _tts_cache_path(db_seg.audio_key)
-                if p.is_file():
+                if _segment_audio_path(ab_id, db_seg.seq).is_file():
                     continue
 
             try:
-                mp3_bytes = _synthesise_text(db_seg.text, voice)
+                mp3_bytes = _synthesise_segment(tts, db_seg.text, voice)
             except TTSProviderError as exc:
                 db_seg.status = SegmentStatus.FAILED
                 db.commit()
@@ -297,15 +301,16 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
                     raise  # allow Celery to retry
                 continue  # permanent failure: skip this segment
 
-            # Determine audio_key (piper is preferred provider)
-            audio_key = _tts_cache_key(db_seg.text, voice, "piper")
-            duration = _mp3_duration_ms(mp3_bytes)
+            # Write MP3 to AUDIOBOOK_AUDIO_DIR/<ab_id>/<seq>.mp3
+            dest = _segment_audio_path(ab_id, db_seg.seq)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(mp3_bytes)
 
-            db_seg.audio_key = audio_key
-            db_seg.duration_ms = duration
+            db_seg.audio_key = _audio_key(ab_id, db_seg.seq)
+            db_seg.duration_ms = _ffprobe_duration_ms(dest, len(db_seg.text))
             db_seg.status = SegmentStatus.READY
             db.commit()
-            task_logger.debug("Segment %d synthesised (%d ms)", db_seg.seq, duration)
+            task_logger.debug("Segment %d synthesised (%d ms)", db_seg.seq, db_seg.duration_ms)
 
         # 8. Finalize
         ready_segs = (

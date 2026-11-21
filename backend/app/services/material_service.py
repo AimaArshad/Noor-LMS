@@ -168,17 +168,12 @@ class MaterialService:
                     file_id = uuid.UUID(str(att["file_id"]))
                     await svc.auto_create_from_material(
                         classroom, file_id, "", created_by=user.id,
-                        file_name=att.get("name", "") or att.get("original_name", ""),
+                        file_name=att.get("name", ""),
                     )
                 except Exception:  # noqa: BLE001
                     await self.db.rollback()  # a failed insert must not poison the session
         except Exception:  # noqa: BLE001
             await self.db.rollback()
-
-
-
-
-
 
 
 

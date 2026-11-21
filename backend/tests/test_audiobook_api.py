@@ -278,16 +278,15 @@ class TestSegmentAudio:
             await db.flush()
 
             # Segment 0: ready, we write an actual file
-            import hashlib
             import pathlib
             from app.core.config import settings
 
             text0 = "Chapter 1. Introduction."
-            voice = "en_US-lessac-medium"
-            key0 = hashlib.sha256(f"piper|{voice}|{text0}".encode()).hexdigest()
-            cache_path = settings.TTS_CACHE_DIR / key0[:2] / f"{key0}.mp3"
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            cache_path.write_bytes(FAKE_MP3)
+            audio_dir = settings.AUDIOBOOK_AUDIO_DIR / str(ab.id)
+            audio_dir.mkdir(parents=True, exist_ok=True)
+            audio_path = audio_dir / "0.mp3"
+            audio_path.write_bytes(FAKE_MP3)
+            audio_key0 = f"{ab.id}/0.mp3"
 
             seg0 = AudiobookSegment(
                 audiobook_id=ab.id,
@@ -296,7 +295,7 @@ class TestSegmentAudio:
                 page_label="1",
                 text=text0,
                 char_count=len(text0),
-                audio_key=key0,
+                audio_key=audio_key0,
                 duration_ms=1500,
                 status=SegmentStatus.READY,
             )
@@ -312,7 +311,7 @@ class TestSegmentAudio:
             db.add(seg0)
             db.add(seg1)
             await db.commit()
-            return ab.id, key0
+            return ab.id, audio_key0
 
     async def test_ready_segment_returns_audio(
         self, client: AsyncClient, session_maker: Any, ctx: dict

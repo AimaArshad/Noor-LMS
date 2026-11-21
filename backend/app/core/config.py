@@ -82,6 +82,8 @@ class Settings(BaseSettings):
     AUDIOBOOK_SEGMENT_MAX_CHARS: int = Field(default=1500, gt=0)
     #: Number of concurrent synthesis workers in the Celery worker process.
     AUDIOBOOK_BUILD_CONCURRENCY: int = Field(default=2, gt=0)
+    #: Directory where the worker writes synthesised audiobook segment MP3s.
+    AUDIOBOOK_AUDIO_DIR: Path = Path("./storage/audiobooks")
 
     # ---- Per-IP limits for /auth/* (slowapi syntax, e.g. "10/minute") ----
     AUTH_RATE_LIMIT_REGISTER: str = "5/minute"
