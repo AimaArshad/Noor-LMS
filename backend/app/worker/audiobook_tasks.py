@@ -179,6 +179,15 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
             task_logger.error("Audiobook %s not found in DB", ab_id)
             return
 
+        # Skip if another worker is already handling this audiobook
+        _IN_PROGRESS = {AudiobookStatus.EXTRACTING, AudiobookStatus.SYNTHESIZING}
+        if ab.status in _IN_PROGRESS:
+            task_logger.warning(
+                "Audiobook %s is already %s — skipping duplicate task",
+                ab_id, ab.status.value,
+            )
+            return
+
         # 1. Mark extracting
         ab.status = AudiobookStatus.EXTRACTING
         db.commit()
@@ -196,6 +205,7 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
         try:
             file_bytes = _read_file_bytes(file_path)
         except Exception as exc:  # noqa: BLE001
+            task_logger.exception("Could not read source file for audiobook %s: %s", ab_id, exc)
             ab.status = AudiobookStatus.FAILED
             ab.error = f"Could not read source file: {exc}"
             db.commit()
@@ -205,11 +215,13 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
         try:
             book = _extract_book(file_bytes, file_obj.mime_type)
         except ExtractionError as exc:
+            task_logger.exception("Extraction failed for audiobook %s: %s", ab_id, exc)
             ab.status = AudiobookStatus.FAILED
             ab.error = str(exc)[:500]
             db.commit()
             return
         except Exception as exc:  # noqa: BLE001
+            task_logger.exception("Unexpected extraction error for audiobook %s", ab_id)
             ab.status = AudiobookStatus.FAILED
             ab.error = f"Extraction error: {exc}"[:500]
             db.commit()
@@ -320,6 +332,7 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
             try:
                 mp3_bytes = _synthesise_segment(tts, db_seg.text, voice)
             except TTSProviderError as exc:
+                task_logger.exception("TTS error on segment %d of audiobook %s", db_seg.seq, ab_id)
                 db_seg.status = SegmentStatus.FAILED
                 db.commit()
                 if exc.transient:
@@ -383,7 +396,8 @@ def build_audiobook(self: Task, audiobook_id: str) -> None:
             task_logger.warning("Transient TTS error; retrying in %ds: %s", backoff, exc)
             raise self.retry(exc=exc, countdown=backoff) from exc
 
-        # Permanent or unknown error: mark failed, don't retry
+        # Permanent or unknown error: log with traceback then mark failed
+        task_logger.exception("audiobook.build failed permanently for %s", audiobook_id)
         try:
             db = _get_sync_session()
             try:

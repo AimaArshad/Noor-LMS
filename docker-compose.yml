@@ -97,6 +97,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      disable: true
     volumes:
       - ./backend/app:/app/app
       - storage_data:/app/storage

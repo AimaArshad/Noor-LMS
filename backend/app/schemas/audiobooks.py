@@ -54,10 +54,12 @@ class AudiobookRead(BaseModel):
     file_id: uuid.UUID
     title: str
     status: AudiobookStatus
+    error: str | None = None
     page_count: int | None
     pages_approximate: bool
     total_duration_ms: int | None
     voice: str | None
+    progress_pct: float | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -71,6 +73,7 @@ class AudiobookListItem(BaseModel):
     title: str
     classroom_name: str
     status: AudiobookStatus
+    error: str | None = None
     progress_pct: float | None
     page_count: int | None
 
@@ -114,8 +117,10 @@ class AudiobookManifest(BaseModel):
     id: uuid.UUID
     title: str
     status: AudiobookStatus
+    error: str | None = None
     page_count: int | None
     total_duration_ms: int | None
+    progress_pct: float | None = None
     sections: list[SectionNode]
     segments: list[SegmentInfo]
     progress: PlaybackProgressRead | None

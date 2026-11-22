@@ -97,7 +97,7 @@ async def create_audiobook(
     "/{audiobook_id}/rebuild",
     response_model=AudiobookRead,
     summary="Re-queue an audiobook build (teacher)",
-    responses={**_403, **_404},
+    responses={**_403, **_404, 409: {"model": Message}},
 )
 async def rebuild_audiobook(
     audiobook_id: uuid.UUID,

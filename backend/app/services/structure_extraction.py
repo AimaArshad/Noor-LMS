@@ -569,14 +569,26 @@ def extract_structure(data: bytes, mime: str) -> ExtractedBook:
     mime = mime.lower()
 
     if mime == "application/pdf" or mime.endswith("/pdf"):
-        return _extract_pdf(data)
+        book = _extract_pdf(data)
+    elif (
+        mime in (
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/msword",
+        )
+        or mime.endswith("docx")
+        or mime.endswith("doc")
+    ):
+        book = _extract_docx(data)
+    else:
+        # Plain text, Markdown, or anything else
+        book = _extract_txt(data)
 
-    if mime in (
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "application/msword",
-    ) or mime.endswith("docx") or mime.endswith("doc"):
-        return _extract_docx(data)
+    # Raise early when the whole document has no usable text (image-only or corrupt)
+    total_chars = sum(len(p.text) for p in book.pages)
+    if total_chars < 200 and book.status != "needs_ocr":
+        raise ExtractionError(
+            "No readable text found (image-only or scanned document)"
+        )
 
-    # Plain text, Markdown, or anything else
-    return _extract_txt(data)
+    return book
 

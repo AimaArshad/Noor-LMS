@@ -10,6 +10,8 @@ def test_worker_lazy_imports_resolve() -> None:
 def test_extract_structure_smoke() -> None:
     from app.services.structure_extraction import extract_structure
 
-    book = extract_structure(b"Chapter 1 Intro\nHello world.\n", "text/plain")
+    # Use at least 200 chars so the minimum-text guard does not raise ExtractionError.
+    body = "Chapter 1 Introduction\n" + ("Hello world. " * 20) + "\n"
+    book = extract_structure(body.encode(), "text/plain")
     assert book.pages and book.pages[0].index == 0
-    assert book.status == "ok"    
+    assert book.status == "ok"

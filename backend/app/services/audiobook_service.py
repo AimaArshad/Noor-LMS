@@ -219,7 +219,12 @@ class AudiobookService:
             classroom, file, data.title, created_by=user.id
         )
         if created:
-            enqueue("audiobook.build", str(ab.id))
+            task_id = enqueue("audiobook.build", str(ab.id))
+            if task_id is None:
+                ab.status = AudiobookStatus.FAILED
+                ab.error = "Could not enqueue build task (broker unavailable)"
+                await self.db.commit()
+                await self.db.refresh(ab)
         return ab
 
     async def auto_create_from_material(
@@ -259,12 +264,25 @@ class AudiobookService:
         if classroom is not None:
             ensure_not_archived(classroom.is_archived)
         await self._assert_teacher_access(ab, user)
+
+        # 409 if the build is already in progress
+        _IN_PROGRESS = {AudiobookStatus.QUEUED, AudiobookStatus.EXTRACTING, AudiobookStatus.SYNTHESIZING}
+        if ab.status in _IN_PROGRESS:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"Audiobook build is already in progress (status: {ab.status.value})",
+            )
+
         # Clear any previously synthesised audio so the worker starts fresh
         shutil.rmtree(_ab_audio_dir(ab.id), ignore_errors=True)
         ab.status = AudiobookStatus.QUEUED
         ab.error = None
         await self.db.commit()
-        enqueue("audiobook.build", str(ab.id))
+        task_id = enqueue("audiobook.build", str(ab.id))
+        if task_id is None:
+            ab.status = AudiobookStatus.FAILED
+            ab.error = "Could not enqueue build task (broker unavailable)"
+            await self.db.commit()
         await self.db.refresh(ab)
         return ab
 
@@ -353,6 +371,7 @@ class AudiobookService:
                     title=ab.title,
                     classroom_name=classroom_name,
                     status=ab.status,
+                    error=ab.error,
                     progress_pct=prog_pct,
                     page_count=ab.page_count,
                 )
@@ -425,12 +444,20 @@ class AudiobookService:
                 updated_at=progress.updated_at,
             )
 
+        total_segs = len(segments)
+        ready_segs = sum(1 for s in segments if s.status == SegmentStatus.READY)
+        manifest_progress_pct: float | None = None
+        if total_segs > 0:
+            manifest_progress_pct = round(ready_segs / total_segs * 100, 1)
+
         return AudiobookManifest(
             id=ab.id,
             title=ab.title,
             status=ab.status,
+            error=ab.error,
             page_count=ab.page_count,
             total_duration_ms=ab.total_duration_ms,
+            progress_pct=manifest_progress_pct,
             sections=section_nodes,
             segments=segment_infos,
             progress=prog_read,
