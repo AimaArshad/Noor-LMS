@@ -69,7 +69,8 @@ def _audio_dir(ab_id: uuid.UUID) -> pathlib.Path:
     """Return the directory that holds all MP3 segments for one audiobook."""
     from app.core.config import settings
 
-    return settings.AUDIOBOOK_AUDIO_DIR / str(ab_id)
+    # return settings.AUDIOBOOK_AUDIO_DIR / str(ab_id)
+    return pathlib.Path(settings.AUDIOBOOK_AUDIO_DIR) / str(ab_id)
 
 
 def _segment_audio_path(ab_id: uuid.UUID, seq: int) -> pathlib.Path:
@@ -112,24 +113,47 @@ def _ffprobe_duration_ms(path: pathlib.Path, text_len: int) -> int:
     return int(text_len / 15 * 1000)
 
 
+def _read_file_bytes(path: pathlib.Path) -> bytes:
+    """Read the uploaded source file from shared storage."""
+    return pathlib.Path(path).read_bytes()
 # ---------------------------------------------------------------------------
 # Pipeline helpers
 # ---------------------------------------------------------------------------
 
+# def _extract_book(file_bytes: bytes, mime_type: str):  # noqa: ANN202
+#     """Run extract_structure in a fresh event loop (sync entry point)."""
+#     from app.services.structure_extraction import extract_structure
+
+#     return asyncio.run(extract_structure(file_bytes, mime_type))
+
 def _extract_book(file_bytes: bytes, mime_type: str):  # noqa: ANN202
-    """Run extract_structure in a fresh event loop (sync entry point)."""
+    """Run extract_structure; works whether it is sync or async."""
+    import inspect
+
     from app.services.structure_extraction import extract_structure
 
-    return asyncio.run(extract_structure(file_bytes, mime_type))
+    result = extract_structure(file_bytes, mime_type)
+    if inspect.iscoroutine(result):
+        result = asyncio.run(result)
+    return result
 
+
+# def _synthesise_segment(tts, text: str, voice: str) -> bytes:
+#     """Synthesise one text segment using a pre-built TTSService; return MP3 bytes.
+
+#     Uses a fresh event loop per call (safe in a sync Celery worker).
+#     TTSService handles its own disk cache, so re-runs skip already-cached audio.
+#     """
+#     return asyncio.run(tts.synthesize(text, voice=voice))
 
 def _synthesise_segment(tts, text: str, voice: str) -> bytes:
-    """Synthesise one text segment using a pre-built TTSService; return MP3 bytes.
+    """Synthesise one segment; works whether tts.synthesize is sync or async."""
+    import inspect
 
-    Uses a fresh event loop per call (safe in a sync Celery worker).
-    TTSService handles its own disk cache, so re-runs skip already-cached audio.
-    """
-    return asyncio.run(tts.synthesize(text, voice=voice))
+    result = tts.synthesize(text, voice=voice)
+    if inspect.iscoroutine(result):
+        result = asyncio.run(result)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -167,7 +191,8 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
             db.commit()
             return
 
-        file_path = settings.STORAGE_DIR / file_obj.path
+        file_path = pathlib.Path(settings.STORAGE_DIR) / file_obj.path
+        # file_path = settings.STORAGE_DIR / file_obj.path
         try:
             file_bytes = _read_file_bytes(file_path)
         except Exception as exc:  # noqa: BLE001

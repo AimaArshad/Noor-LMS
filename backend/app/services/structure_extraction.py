@@ -56,6 +56,8 @@ from typing import Literal
 
 PAGE_CHAR_CAP = 2000  # maximum characters stored per page
 
+class ExtractionError(Exception):
+    """Raised when a document cannot be turned into readable text."""
 
 @dataclass
 class Page:
