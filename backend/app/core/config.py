@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     #: Directory where the worker writes synthesised audiobook segment MP3s.
     AUDIOBOOK_AUDIO_DIR: Path = Path("./storage/audiobooks")
 
+    # ---- Voice / Whisper (Speech-to-Text) ----
+    #: faster-whisper model name (e.g. "base.en", "small.en", "medium.en").
+    WHISPER_MODEL: str = "base.en"
+    #: Directory where faster-whisper caches downloaded model files.
+    WHISPER_CACHE_DIR: Path = Path("./whisper_cache")
+
     # ---- Per-IP limits for /auth/* (slowapi syntax, e.g. "10/minute") ----
     AUTH_RATE_LIMIT_REGISTER: str = "5/minute"
     AUTH_RATE_LIMIT_LOGIN: str = "10/minute"

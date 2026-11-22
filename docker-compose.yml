@@ -50,6 +50,7 @@ services:
       PIPER_VOICES_DIR: /app/voices
       TTS_CACHE_DIR: /app/tts_cache
       AUDIOBOOK_AUDIO_DIR: /app/storage/audiobooks
+      WHISPER_CACHE_DIR: /app/whisper_cache
       # Structured logging: JSON in production, readable text elsewhere ("auto")
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: ${LOG_FORMAT:-auto}
@@ -69,6 +70,7 @@ services:
       - piper_voices:/app/voices
       - tts_cache:/app/tts_cache
       - audiobook_audio:/app/storage/audiobooks
+      - whisper_cache:/app/whisper_cache
 
   worker:
     build:
@@ -132,3 +134,4 @@ volumes:
   piper_voices:
   tts_cache:
   audiobook_audio:
+  whisper_cache:

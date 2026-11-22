@@ -16,6 +16,7 @@ from app.api.v1.routers import (
     quizzes,
     todo,
     users,
+    voice,
 )
 
 api_router = APIRouter()
@@ -61,9 +62,9 @@ api_router.include_router(
     accessibility.router, prefix="/accessibility", tags=["accessibility"]
 )
 api_router.include_router(users.router, prefix="/users", tags=["users"])
-api_router.include_router(
-    audiobooks.classroom_router,
+api_router.include_router(audiobooks.classroom_router,
     prefix="/classrooms/{classroom_id}/audiobooks",
     tags=["audiobooks"],
 )
 api_router.include_router(audiobooks.audiobook_router, prefix="/audiobooks", tags=["audiobooks"])
+api_router.include_router(voice.router, prefix="/voice", tags=["voice"])
