@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { suffix: "", label: "Stream", end: true },
   { suffix: "/classwork", label: "Classwork", end: false },
+  { suffix: "/audiobooks", label: "Audiobooks", end: false },
   { suffix: "/people", label: "People", end: false },
   { suffix: "/grades", label: "Grades", end: false },
 ];

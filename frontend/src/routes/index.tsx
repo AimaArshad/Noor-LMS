@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { ClassroomLayout } from "@/components/layout/ClassroomLayout";
 import { AdminPage } from "@/pages/AdminPage";
 import { AssignmentPage } from "@/pages/classroom/AssignmentPage";
+import { AudiobooksPage } from "@/pages/classroom/AudiobooksPage";
 import { ClassworkPage } from "@/pages/classroom/ClassworkPage";
 import { GradesPage } from "@/pages/classroom/GradesPage";
 import { PeoplePage } from "@/pages/classroom/PeoplePage";
@@ -52,6 +53,7 @@ export const router = createBrowserRouter(
               children: [
                 { index: true, element: <StreamPage /> },
                 { path: "classwork", element: <ClassworkPage /> },
+                { path: "audiobooks", element: <AudiobooksPage /> },
                 { path: "people", element: <PeoplePage /> },
                 { path: "grades", element: <GradesPage /> },
                 { path: "assignments/:assignmentId", element: <AssignmentPage /> },
