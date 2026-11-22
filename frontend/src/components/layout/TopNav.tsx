@@ -1,4 +1,6 @@
 import { GraduationCap, Home, ListTodo, LogOut, Shield, User as UserIcon, type LucideIcon } from "lucide-react";
+
+import { AccessibilityToggle } from "@/components/voice/AccessibilityToggle";
 import { Link, NavLink } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
@@ -67,6 +69,7 @@ export function TopNav() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
+          <AccessibilityToggle />
           <NotificationBell />
           {user ? (
             <span className="hidden items-center gap-2 sm:flex">

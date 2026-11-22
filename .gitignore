@@ -15,3 +15,14 @@ backend/storage/*
 voices/
 tts_cache/
 *.onnx
+
+
+physics_audio/
+*.mp3
+error.txt
+worker.txt
+sections_level1.txt
+pdf_layout.txt
+check_pdf.py
+dump_layout.py
+try_extract.py
