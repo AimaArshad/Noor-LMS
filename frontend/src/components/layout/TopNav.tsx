@@ -1,4 +1,4 @@
-import { GraduationCap, Home, ListTodo, LogOut, Shield, User as UserIcon, type LucideIcon } from "lucide-react";
+import { GraduationCap, Headphones, Home, ListTodo, LogOut, Shield, User as UserIcon, type LucideIcon } from "lucide-react";
 
 import { AccessibilityToggle } from "@/components/voice/AccessibilityToggle";
 import { Link, NavLink } from "react-router-dom";
@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Home", icon: Home, end: true },
   { to: "/todo", label: "To-Do", icon: ListTodo },
   { to: "/classes", label: "Classes", icon: GraduationCap },
+  { to: "/audiobooks", label: "Audiobooks", icon: Headphones },
   { to: "/profile", label: "Profile", icon: UserIcon },
 ];
 

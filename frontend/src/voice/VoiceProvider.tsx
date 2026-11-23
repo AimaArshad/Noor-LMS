@@ -26,6 +26,8 @@ import {
 
 import { api } from "@/api/client";
 import { sendCommand, type VoiceCommandResponse } from "@/voice/voiceClient";
+import { AudiobookVoiceRouter } from "@/features/audiobooks/AudiobookVoiceRouter";
+import { resolveNavigation } from "@/features/audiobooks/voiceNavigation";
 import { useSpeechRecognition } from "@/voice/useSpeechRecognition";
 import { useSpeak } from "@/voice/useSpeak";
 
@@ -161,7 +163,10 @@ export function VoiceProvider({ children, audiobookId }: VoiceProviderProps) {
 
     void (async () => {
       try {
-        const cmd = await sendCommand(transcript, audiobookId ?? activeAudiobookId ?? undefined);
+        // Local voice navigation first (home, classes, audiobooks, play <book>), then the backend.
+        const cmd =
+          (await resolveNavigation(transcript)) ??
+          (await sendCommand(transcript, audiobookId ?? activeAudiobookId ?? undefined));
         // Always announce the speech sentence
         announce(cmd.speech);
         // Notify all registered handlers
@@ -222,6 +227,7 @@ export function VoiceProvider({ children, audiobookId }: VoiceProviderProps) {
           border: 0,
         }}
       />
+      <AudiobookVoiceRouter onCommand={onCommand} />
       {children}
     </VoiceContext.Provider>
   );
