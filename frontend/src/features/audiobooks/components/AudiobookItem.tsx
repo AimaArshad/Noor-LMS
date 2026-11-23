@@ -1,4 +1,5 @@
-import { RefreshCw, Trash2 } from "lucide-react";
+import { Play, RefreshCw, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { getErrorMessage } from "@/api/errors";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
@@ -98,6 +99,7 @@ export function AudiobookItemCard({
 
   const isBuilding = BUILDING_STATUSES.includes(item.status);
   const canManage = isTeacher && !isArchived;
+  const canPlay = item.status === "ready" || item.status === "synthesizing";
 
   return (
     <Card>
@@ -166,6 +168,17 @@ export function AudiobookItemCard({
             </div>
           ) : null}
         </div>
+
+        {canPlay ? (
+          <Link
+            to={`/audiobooks/${item.id}`}
+            aria-label={`Play ${item.title}`}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Play className="h-4 w-4" aria-hidden="true" />
+            Play
+          </Link>
+        ) : null}
 
         {/* Progress bar — only while building */}
         {isBuilding && item.progress_pct != null ? (

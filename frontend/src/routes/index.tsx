@@ -5,6 +5,8 @@ import { ClassroomLayout } from "@/components/layout/ClassroomLayout";
 import { AdminPage } from "@/pages/AdminPage";
 import { AssignmentPage } from "@/pages/classroom/AssignmentPage";
 import { AudiobooksPage } from "@/pages/classroom/AudiobooksPage";
+import { AudiobookLibraryPage } from "@/pages/AudiobookLibraryPage";
+import { AudiobookPlayerPage } from "@/pages/AudiobookPlayerPage";
 import { ClassworkPage } from "@/pages/classroom/ClassworkPage";
 import { GradesPage } from "@/pages/classroom/GradesPage";
 import { PeoplePage } from "@/pages/classroom/PeoplePage";
@@ -43,6 +45,8 @@ export const router = createBrowserRouter(
             { path: "todo", element: <TodoPage /> },
             { path: "classes", element: <ClassesPage /> },
             { path: "profile", element: <ProfilePage /> },
+            { path: "audiobooks", element: <AudiobookLibraryPage /> },
+            { path: "audiobooks/:audiobookId", element: <AudiobookPlayerPage /> },
             {
               element: <RoleRoute roles={["admin"]} />,
               children: [{ path: "admin", element: <AdminPage /> }],

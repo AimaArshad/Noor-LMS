@@ -64,6 +64,8 @@ interface VoiceContextValue {
   onCommand: (handler: (cmd: VoiceCommandResponse) => void) => () => void;
   /** Speak text aloud (passes through to useSpeak). */
   speak: (text: string) => void;
+  /** Tell the voice system which audiobook is open (used when resolving commands). */
+  setActiveAudiobook: (id: string | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +94,7 @@ export function VoiceProvider({ children, audiobookId }: VoiceProviderProps) {
   // --- Accessibility settings ---
   const [settings, setSettings] = useState<AccessibilitySettings | null>(null);
   const [accessibilityMode, setAccessibilityModeState] = useState(false);
+  const [activeAudiobookId, setActiveAudiobookId] = useState<string | null>(null);
 
   useEffect(() => {
     void api
@@ -158,7 +161,7 @@ export function VoiceProvider({ children, audiobookId }: VoiceProviderProps) {
 
     void (async () => {
       try {
-        const cmd = await sendCommand(transcript, audiobookId);
+        const cmd = await sendCommand(transcript, audiobookId ?? activeAudiobookId ?? undefined);
         // Always announce the speech sentence
         announce(cmd.speech);
         // Notify all registered handlers
@@ -167,7 +170,7 @@ export function VoiceProvider({ children, audiobookId }: VoiceProviderProps) {
         announce("Sorry, I could not process that command.");
       }
     })();
-  }, [transcript, audiobookId, announce]);
+  }, [transcript, audiobookId, activeAudiobookId, announce]);
 
   // --- listen() ---
   const listen = useCallback(() => {
@@ -194,6 +197,7 @@ export function VoiceProvider({ children, audiobookId }: VoiceProviderProps) {
       listening,
       onCommand,
       speak: announce,
+      setActiveAudiobook: setActiveAudiobookId,
     }),
     [accessibilityMode, setAccessibilityMode, settings, listen, listening, onCommand, announce],
   );
