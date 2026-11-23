@@ -1,4 +1,4 @@
-# EduConnect
+# Noor LMS
 
 A Google-Classroom-style learning platform with an **accessibility mode for blind students**.
 Teachers upload PDF / DOCX / TXT material; the system turns it into chapter-organised audio
@@ -47,7 +47,7 @@ everything **by voice or keyboard**. English only.
 ## 3. Repository layout
 
 ```text
-educonnect/
+Noor-LMS/
   backend/    FastAPI app, Alembic migrations, tests, Dockerfile, requirements*.txt
   frontend/   React + Vite app (Dockerfile + nginx.conf)
   docs/
@@ -64,8 +64,8 @@ educonnect/
 ## 5. Clone
 
 ```powershell
-git clone https://github.com/AimaArshad/educonnect.git
-cd educonnect
+git clone https://github.com/AimaArshad/Noor-LMS.git
+cd Noor-LMS
 git checkout feature-fullstack-ai
 ```
 

@@ -94,6 +94,7 @@ OPENAPI_TAGS = [
         "name": "audiobooks",
         "description": "Audiobook creation, manifest, segment audio, search and playback progress.",
     },
+    {"name": "voice", "description": "Voice commands and speech-to-text for the accessibility mode."},
 ]
 
 _ERROR_JSON = {"model": ErrorResponse}
