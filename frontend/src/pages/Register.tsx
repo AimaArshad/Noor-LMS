@@ -100,7 +100,7 @@ export function RegisterPage() {
       footer={
         <>
           Already registered?{" "}
-          <Link to="/login" state={location.state} className="text-primary underline-offset-4 hover:underline">
+          <Link to="/login" state={location.state} className="text-primary underline underline-offset-4">
             Sign in
           </Link>
         </>

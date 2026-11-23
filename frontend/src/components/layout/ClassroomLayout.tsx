@@ -27,7 +27,7 @@ export function ClassroomLayout() {
         <p className="mt-1 text-muted-foreground">
           {missing ? "It does not exist, or you are not a member." : "Please try again in a moment."}
         </p>
-        <Link to="/classes" className="mt-4 inline-block text-primary underline-offset-4 hover:underline">
+        <Link to="/classes" className="mt-4 inline-block text-primary underline underline-offset-4">
           Back to your classes
         </Link>
       </div>

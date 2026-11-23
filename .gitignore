@@ -26,3 +26,5 @@ pdf_layout.txt
 check_pdf.py
 dump_layout.py
 try_extract.py
+frontend/playwright-report/
+frontend/test-results/

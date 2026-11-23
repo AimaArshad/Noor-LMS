@@ -46,7 +46,7 @@ export function LoginPage() {
       footer={
         <>
           No account?{" "}
-          <Link to="/register" state={location.state} className="text-primary underline-offset-4 hover:underline">
+          <Link to="/register" state={location.state} className="text-primary underline underline-offset-4">
             Create one
           </Link>
         </>

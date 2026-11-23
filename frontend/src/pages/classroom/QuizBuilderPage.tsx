@@ -17,7 +17,7 @@ export function QuizBuilderPage() {
             ? "This class is archived and read-only."
             : "Only teachers of this class can create quizzes."}
         </p>
-        <Link to={`/classes/${classroom.id}/classwork`} className="text-primary underline-offset-4 hover:underline">
+        <Link to={`/classes/${classroom.id}/classwork`} className="text-primary underline underline-offset-4">
           Back to classwork
         </Link>
       </div>

@@ -88,9 +88,12 @@ export function useSpeak(): UseSpeakReturn {
         utterance.onend = () => {
           synthSpeakingRef.current = false;
         };
-        utterance.onerror = () => {
+        utterance.onerror = (event) => {
           synthSpeakingRef.current = false;
-          // Fall back to TTS API on speech synthesis error
+          // stop()/cancel() raises 'canceled'/'interrupted': that is not a failure,
+          // so do not replay the old text through the server voice (double voice).
+          const err = (event as SpeechSynthesisErrorEvent).error;
+          if (err === "canceled" || err === "interrupted") return;
           void speakViaTTS(text);
         };
 
