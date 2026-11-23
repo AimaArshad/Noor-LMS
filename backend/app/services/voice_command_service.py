@@ -32,18 +32,41 @@ from app.services.voice_parser import Command, parse_command
 
 logger = logging.getLogger("educonnect.voice_command")
 
+import re
+
+_ORDINALS = ((r"\bfirst\b", "1st"), (r"\bsecond\b", "2nd"), (r"\bthird\b", "3rd"), (r"\bfourth\b", "4th"))
+
+
+def _norm(s: str) -> str:
+    """Lower-case, hyphens/punctuation to spaces, spoken ordinals to digits."""
+    t = re.sub(r"[^a-z0-9\s]", " ", s.lower())
+    for pat, rep in _ORDINALS:
+        t = re.sub(pat, rep, t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _join_hints(book: str | None, cls: str | None) -> str:
+    """Join the book and class hints without repeating one inside the other."""
+    b, c = (book or "").strip(), (cls or "").strip()
+    if b and c and _norm(c) in _norm(b):
+        return b
+    if b and c and _norm(b) in _norm(c):
+        return c
+    return " ".join(x for x in (b, c) if x)
+
+
 # rapidfuzz is optional-soft: if missing, fall back to plain substring
 try:
     from rapidfuzz import fuzz as _fuzz
 
     def _score(a: str, b: str) -> float:
-        return _fuzz.token_set_ratio(a.lower(), b.lower())
+        return _fuzz.token_set_ratio(_norm(a), _norm(b))
 
 except ImportError:  # pragma: no cover
     logger.warning("rapidfuzz not installed; falling back to substring matching")
 
     def _score(a: str, b: str) -> float:  # type: ignore[misc]
-        a_l, b_l = a.lower(), b.lower()
+        a_l, b_l = _norm(a), _norm(b)
         if a_l in b_l or b_l in a_l:
             return 90.0
         return 0.0
@@ -64,12 +87,12 @@ async def _accessible_audiobooks(
 
     if user.role == UserRole.ADMIN:
         stmt = (
-            select(Audiobook, Classroom.name)
+            select(Audiobook, Classroom)
             .join(Classroom, Classroom.id == Audiobook.classroom_id)
         )
     else:
         stmt = (
-            select(Audiobook, Classroom.name)
+            select(Audiobook, Classroom)
             .join(Classroom, Classroom.id == Audiobook.classroom_id)
             .join(
                 ClassroomMember,
@@ -81,7 +104,18 @@ async def _accessible_audiobooks(
         )
 
     rows = (await db.execute(stmt)).all()
-    return [(ab, name) for ab, name in rows]
+    # the match text covers classroom name, section and subject
+    return [
+        (
+            ab,
+            " ".join(
+                str(x)
+                for x in (c.name, getattr(c, "section", None), getattr(c, "subject", None))
+                if x
+            ),
+        )
+        for ab, c in rows
+    ]
 
 
 def _best_book_match(
@@ -109,7 +143,7 @@ def _best_book_match(
             return books[0][0]
         return None
 
-    query = " ".join(filter(None, [hint, class_hint])).strip()
+    query = _join_hints(hint, class_hint)
 
     best_ab: Audiobook | None = None
     best_score = _FUZZY_THRESHOLD - 1
@@ -253,7 +287,7 @@ async def resolve_voice_command(
 
         ab = _best_book_match(book_hint, class_hint, books, audiobook_id)
         if ab is None:
-            hint_text = " ".join(filter(None, [book_hint, class_hint])) or "the book"
+            hint_text = _join_hints(book_hint, class_hint) or "the book"
             return VoiceCommandResponse(
                 intent=intent,
                 action="none",
@@ -359,7 +393,7 @@ async def resolve_voice_command(
 
         ab = _best_book_match(book_hint, class_hint, books, audiobook_id)
         if ab is None:
-            hint_text = " ".join(filter(None, [book_hint, class_hint])) or "the book"
+            hint_text = _join_hints(book_hint, class_hint) or "the book"
             return VoiceCommandResponse(
                 intent=intent,
                 action="none",

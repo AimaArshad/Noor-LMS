@@ -256,4 +256,43 @@ Things that bite if forgotten:
 5. Set `DATABASE_URL`, `REDIS_URL`, `CELERY_BROKER_URL`, a strong `SECRET_KEY`, `CORS_ORIGINS` (frontend URL), production environment name.
 6. Worker sizing: Piper and faster-whisper need CPU and memory (start at 2 vCPU / 4 GB and measure); the Whisper model downloads on first use,
    so mount a persistent cache or bake the model into the image.
-7. Serve the frontend over HTTPS (microphone requires a secure context) and build it with the production API URL.
+7. Serve the frontend over HTTPS (microphone requires a secure context) and build it with the production API URL. 
+
+
+ ## 16. Voice command cheat sheet (for the demo)
+
+Turn on **A11y**, press **V** (or click the microphone), wait a moment, then say **one** command.
+Browser: Chrome. Say "help" at any time to hear the list.
+
+### Anywhere in the app
+| Say | What happens |
+|---|---|
+| "open audiobooks" | Opens the audiobook list and reads the titles |
+| "what audiobooks do I have" | Same as above |
+| "play physics 2nd year" | Opens that book and starts playing |
+| "go home" | Home page |
+| "open my classes" | Classes page |
+| "open to do" | To-do list |
+| "help" | Reads the list of commands |
+
+### Inside an audiobook
+| Say | What happens |
+|---|---|
+| "play" / "resume" | Starts or continues |
+| "pause" / "stop" | Pauses |
+| "forward" / "forward thirty seconds" | Skips 30 seconds ahead |
+| "backward" / "backward thirty seconds" | Goes 30 seconds back |
+| "faster" / "slower" | Changes speed (0.75x to 2x) |
+| "next chapter" / "previous chapter" | Jumps between chapters |
+| "go to chapter two" | Jumps to chapter 2 |
+| "go to physics chapter 2 class 1st year" | Chapter 2 of the matching book |
+| "play topic kinetic theory" | Jumps to that topic |
+| "go to page 23" / "play page number 23 of physics class 1st year" | Jumps to that page |
+
+If something is not found, the system says so aloud (for example "I could not find chapter 12").
+
+### Keyboard (no voice needed)
+Space play/pause · Left/Right arrow skip 30 s · `[` `]` slower/faster · `N` / `P` next/previous chapter · `V` voice.
+
+### Known gaps
+"where am I" is recognised but only answers "Fetching your current position" and does not read the position yet. Avoid it in the demo.

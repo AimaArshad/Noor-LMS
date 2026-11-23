@@ -34,6 +34,7 @@ import uuid
 from celery import Task
 from celery.utils.log import get_task_logger
 
+from app.services.build_staleness import is_stale
 from app.worker.celery_app import celery_app
 
 task_logger = get_task_logger("educonnect.audiobook_tasks")
@@ -113,6 +114,16 @@ def _ffprobe_duration_ms(path: pathlib.Path, text_len: int) -> int:
     return int(text_len / 15 * 1000)
 
 
+def _touch(db, ab_id: uuid.UUID) -> None:
+    """Bump audiobooks.updated_at so a long healthy build is never seen as stale."""
+    from sqlalchemy import func, update
+
+    from app.models.audiobook import Audiobook
+
+    db.execute(update(Audiobook).where(Audiobook.id == ab_id).values(updated_at=func.now()))
+    db.commit()
+
+
 def _read_file_bytes(path: pathlib.Path) -> bytes:
     """Read the uploaded source file from shared storage."""
     return pathlib.Path(path).read_bytes()
@@ -181,7 +192,7 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
 
         # Skip if another worker is already handling this audiobook
         _IN_PROGRESS = {AudiobookStatus.EXTRACTING, AudiobookStatus.SYNTHESIZING}
-        if ab.status in _IN_PROGRESS:
+        if ab.status in _IN_PROGRESS and not is_stale(ab.updated_at):
             task_logger.warning(
                 "Audiobook %s is already %s — skipping duplicate task",
                 ab_id, ab.status.value,
@@ -323,6 +334,8 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
             .all()
         )
 
+        _touch(db, ab_id)
+        synthesised = 0
         for db_seg in db_segs:
             # Idempotent: skip if already ready AND the MP3 file exists on disk
             if db_seg.status == SegmentStatus.READY and db_seg.audio_key:
@@ -349,6 +362,9 @@ def _build_audiobook_sync(audiobook_id_str: str) -> None:  # noqa: C901, PLR0912
             db_seg.status = SegmentStatus.READY
             db.commit()
             task_logger.debug("Segment %d synthesised (%d ms)", db_seg.seq, db_seg.duration_ms)
+            synthesised += 1
+            if synthesised % 10 == 0:
+                _touch(db, ab_id)
 
         # 8. Finalize
         ready_segs = (

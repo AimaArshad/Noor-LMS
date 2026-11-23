@@ -195,8 +195,15 @@ def build_segments(book: ExtractedBook) -> list[SegmentDraft]:
     # Track current section
     current_section_idx: int | None = None
 
+    # With at least two chapters, nothing before the first chapter is read aloud
+    # (cover, credits, contents). Page numbers and indexes are unchanged.
+    level1_pages = sorted(s.start_page for s in book.sections if s.level == 1)
+    first_chapter_page = level1_pages[0] if len(level1_pages) >= 2 else None
+
     for page in book.pages:
         page_idx = page.index
+        if first_chapter_page is not None and page_idx < first_chapter_page:
+            continue
         page_text = page.text.strip()
 
         # --- Insert announcements for sections starting on this page --- #

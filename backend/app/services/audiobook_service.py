@@ -47,6 +47,7 @@ from app.schemas.audiobooks import (
     SectionNode,
     SegmentInfo,
 )
+from app.services.build_staleness import is_stale
 from app.worker.dispatch import enqueue
 
 logger = logging.getLogger("educonnect.audiobooks")
@@ -267,7 +268,7 @@ class AudiobookService:
 
         # 409 if the build is already in progress
         _IN_PROGRESS = {AudiobookStatus.QUEUED, AudiobookStatus.EXTRACTING, AudiobookStatus.SYNTHESIZING}
-        if ab.status in _IN_PROGRESS:
+        if ab.status in _IN_PROGRESS and not is_stale(ab.updated_at):
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
                 f"Audiobook build is already in progress (status: {ab.status.value})",
@@ -277,6 +278,7 @@ class AudiobookService:
         shutil.rmtree(_ab_audio_dir(ab.id), ignore_errors=True)
         ab.status = AudiobookStatus.QUEUED
         ab.error = None
+        ab.updated_at = func.now()
         await self.db.commit()
         task_id = enqueue("audiobook.build", str(ab.id))
         if task_id is None:
