@@ -1,156 +1,67 @@
-# EduConnect Backend
-
-FastAPI + SQLAlchemy 2.0 (async) + PostgreSQL. Phase 1: full Google Classroom functionality.
-
-## Requirements
-
-- Python 3.11+
-- PostgreSQL 14+ and Redis 6+ (or Docker)
-
-## Run with Docker (recommended)
-
-From the repository root:
-
-```bash
-cp backend/.env.example backend/.env
-docker compose up --build
-```
-
-- API: http://localhost:8000
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- Health: http://localhost:8000/health and http://localhost:8000/health/ready
-
-Stop with `docker compose down` (add `-v` to also delete data volumes).
-
-## Run locally (without a backend container)
-
-```bash
-# 1. Start only the infrastructure
-docker compose up -d postgres redis
-
-# 2. Create a virtualenv and install dependencies
-cd backend
-python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-
-# 3. Configure environment
-cp .env.example .env
-
-# 4. Start the API with hot reload
-uvicorn app.main:app --reload --port 8000
-```
-
-## Project layout
-
-```text
-app/
-├── main.py          # FastAPI app factory, CORS, rate limiting, health
-├── core/            # config, security, dependencies
-├── db/              # engine, session, declarative base
-├── models/          # SQLAlchemy models
-├── schemas/         # Pydantic schemas
-├── api/v1/          # routers (auth, users, classrooms, ...)
-├── services/        # business logic
-├── utils/           # helpers
-└── websockets/      # realtime notifications
-```
-
-## Configuration
-
-All settings come from environment variables / `.env` (see `.env.example`).
-`JWT_SECRET` must be at least 32 characters and must not contain the placeholder
-`change-me` when `ENVIRONMENT=production`.
-
-Logging is configured with `LOG_LEVEL` and `LOG_FORMAT` (`auto` = JSON lines in
-production/staging, readable text elsewhere). The per-IP limits for `/auth/*` are
-configurable with `AUTH_RATE_LIMIT_REGISTER`, `AUTH_RATE_LIMIT_LOGIN`,
-`AUTH_RATE_LIMIT_REFRESH`, `AUTH_RATE_LIMIT_LOGOUT` and `AUTH_RATE_LIMIT_ME`.
-
-## API conventions
-
-- Errors: `{"error": {"code": "not_found", "message": "…", "details": null}}`; `422` lists
-  each problem in `details`, `429` adds `retry_after_seconds` and a `Retry-After` header.
-- Request ids: every response carries `X-Request-ID` (send your own, 8–64 chars of
-  `A-Za-z0-9._-`), and the same id is on every log line of that request.
-- Pagination: `limit` (1–100) and `offset` (0–100000) on list endpoints; `GET /classrooms`
-  returns the total in `X-Total-Count`.
-- Security headers: `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, a strict CSP,
-  `Cache-Control: no-store` on API responses, and HSTS in production.
-- Free text is normalised (NFC) and stripped of control characters and bidi overrides at
-  the API boundary; HTML is escaped on output, never on input.
-
-## Tests
-
-```bash
-pytest -q
-```
-
-## Migrations (available from STEP 2)
-
-```bash
-alembic revision --autogenerate -m "message"
-alembic upgrade head
-```
-
-----------------------------
-
 # EduConnect
 
-A Google-Classroom-style learning platform with an **accessibility mode for blind students**:
-teachers upload PDF / DOCX / TXT material, the system turns it into chapter-organised audio
-(an "audiobook") using free, open-source text-to-speech, and students listen from the app.
+A Google-Classroom-style learning platform with an **accessibility mode for blind students**.
+Teachers upload PDF / DOCX / TXT material; the system turns it into chapter-organised audio
+(an "audiobook") with free, open-source text-to-speech; students listen in the app and control
+everything **by voice or keyboard**. English only.
 
-> **Status:** implemented up to and including **text-to-speech and the audiobook pipeline**.
-> Speech-to-text (voice commands such as "go to physics chapter 2") and the voice-driven
-> frontend are planned next (see [Roadmap](#roadmap)).
+> **Status:** audiobook pipeline, voice backend, teacher screens, student player and app-wide voice
+> navigation are implemented. Open items are listed in [Roadmap](#14-roadmap-and-known-limitations).
 
 ---
 
 ## 1. What is implemented
 
-- **Core LMS:** auth (JWT, roles: admin / teacher / student), classrooms (join codes, archive),
-  announcements, assignments, materials, quizzes, comments, notifications (REST + WebSocket),
-  to-do, file uploads.
-- **Accessibility:** per-user accessibility preferences, TTS endpoint with disk cache.
-- **Audiobook pipeline:**
-  1. Teacher uploads a file, then creates an audiobook (or attaches the file to a *material*, which auto-creates it).
-  2. A Celery worker extracts structure (PDF outline / headings, DOCX headings, TXT chapters),
-     removes running headers, splits text into ~800-1500 character segments.
-  3. Each segment is synthesised with **Piper** (espeak-ng fallback), converted to MP3 with ffmpeg.
-  4. API serves a **manifest** (chapters + segments + durations), **segment audio** (HTTP Range supported),
-     **search**, and **playback progress**.
-- Access rules: non-members get 404, students get 403 on teacher actions, archived classrooms are read-only.
+- **Core LMS:** auth (JWT; roles admin / teacher / student), classrooms (join codes, archive), announcements,
+  assignments, materials, quizzes, comments, notifications, to-do, file uploads.
+- **Audiobook pipeline (backend):**
+  1. A teacher uploads a file and creates an audiobook in a classroom.
+  2. A Celery worker extracts the structure. PDFs with bookmarks use them; PDFs without bookmarks use chapter-opener
+     pages ("After studying this chapter...") and the Contents page; numbered ALL-CAPS headings become topics. DOCX uses
+     headings, TXT uses "Chapter N" lines. Images are skipped (no OCR).
+  3. Text is split into ~800-1500 character segments, each synthesised with **Piper** (espeak-ng fallback) and stored as MP3.
+     Segments become playable progressively while the book is still building.
+  4. The API serves a manifest (chapters, topics, segments, durations), segment audio (HTTP Range), search and playback progress.
+- **Voice backend:** `POST /api/v1/voice/command` turns a sentence into an action (play, pause, stop, forward/backward 30 s,
+  faster/slower, next/previous chapter, go to chapter / topic / page) with fuzzy book matching (rapidfuzz) and a spoken reply
+  (including "not found" messages). `POST /api/v1/voice/transcribe` is a server fallback for speech-to-text (faster-whisper).
+- **Frontend:**
+  - Teacher: classroom **Audiobooks** tab with upload form (PDF/DOCX/TXT, 25 MB), progress bar, status badge, polling,
+    Rebuild and Delete.
+  - Student: **Audiobooks** library (`/audiobooks`) and **player** (`/audiobooks/:id`): sequential playback, chapter/topic list,
+    +/-30 s across segments, speed 0.75x-2x, resume position, keyboard shortcuts.
+  - **Voice:** header toggle "A11y: on/off", microphone button and the `V` key. Browser speech recognition first, server
+    Whisper as fallback. Spoken replies use the browser's speech synthesis.
+  - App-wide voice navigation: "open audiobooks", "go home", "open my classes", "play physics 2nd year" from any page.
 
 ## 2. Tech stack
 
 | Layer | Technology |
 |---|---|
 | Backend | FastAPI, SQLAlchemy 2.0 (async), Alembic, PostgreSQL 16 (`pg_trgm`), Redis 7, Celery |
-| TTS | Piper (`piper-tts`), espeak-ng fallback, ffmpeg |
-| Frontend | React 19, TypeScript, Vite, Tailwind |
+| Audio | Piper TTS (`piper-tts`), espeak-ng fallback, ffmpeg / ffprobe |
+| Voice | rapidfuzz (command matching), faster-whisper `base.en` (int8, CPU) for server transcription |
+| Frontend | React 19, TypeScript, Vite, Tailwind, TanStack Query, Vitest |
 | Packaging | Docker Compose (postgres, redis, backend, worker, frontend) |
 
 ## 3. Repository layout
 
 ```text
 educonnect/
-  backend/            FastAPI app, Alembic migrations, tests, Dockerfile, requirements*.txt
-  frontend/           React + Vite app (Dockerfile + nginx.conf)
+  backend/    FastAPI app, Alembic migrations, tests, Dockerfile, requirements*.txt
+  frontend/   React + Vite app (Dockerfile + nginx.conf)
   docs/
   docker-compose.yml
 ```
 
 ## 4. Prerequisites
 
-- Git
-- Docker Desktop (for Postgres/Redis and the full Docker run)
-- Python 3.11 or 3.12 (the Docker image uses 3.11)
+- Git, Docker Desktop, Python 3.11 or 3.12 (Docker image uses 3.11)
 - **Node.js 22.12 or newer** (Vite 8 / Vitest 5 do not work on Node 20)
-- Only if you run the Celery worker outside Docker: ffmpeg and (optionally) espeak-ng on your PATH
+- **Google Chrome** for voice control (browser speech recognition). Edge is not recommended for the demo.
+- Only to run the Celery worker outside Docker: ffmpeg and (optionally) espeak-ng on PATH
 
-## 5. Clone the repository
+## 5. Clone
 
 ```powershell
 git clone https://github.com/AimaArshad/educonnect.git
@@ -158,101 +69,118 @@ cd educonnect
 git checkout feature-fullstack-ai
 ```
 
-## 6. Run locally (without Docker for the apps)
+## 6. Run the whole app with Docker (recommended for the demo)
 
-### 6.1 Start the databases
+```powershell
+docker compose build
+docker compose up -d postgres redis backend worker
+docker compose ps                                       # all Up / healthy
+docker compose exec backend alembic upgrade head        # first run / after new migrations
+```
+
+- API + Swagger: <http://localhost:8000/docs>
+- Logs: `docker compose logs -f backend`, `docker compose logs -f worker`
+- Stop: `docker compose stop` (keeps data). **Never run `docker compose down -v`** (it deletes the database and all audio).
+- Do not run a local `uvicorn` on port 8000 while the Docker backend runs.
+- Code is baked into the images: after changing backend code run `docker compose build backend worker` then
+  `docker compose up -d backend worker`.
+- Volumes: `educonnect_audiobook_audio` (MP3s), `educonnect_tts_cache`, `educonnect_piper_voices`, `educonnect_whisper_cache`,
+  uploads, Postgres data.
+
+Frontend (dev server, separate terminal):
+
+```powershell
+cd frontend
+node -v                         # 22.12 or newer
+npm install
+copy .env.example .env          # API URL
+npm run dev                     # http://localhost:5173  (open in Chrome)
+```
+
+## 7. Run the backend locally instead of in Docker
 
 ```powershell
 docker compose up -d postgres redis
-```
-
-### 6.2 Backend
-
-```powershell
 cd backend
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-copy .env.example .env          # then edit values (database URL, secrets, ...)
-alembic upgrade head            # create / update tables
-uvicorn app.main:app --reload   # http://127.0.0.1:8000/docs
+copy .env.example .env
+alembic upgrade head
+uvicorn app.main:app --reload
 ```
 
-Optional: the audiobook **worker** locally (Celery's default pool does not work on Windows):
+The API and the Celery worker must run in the **same environment** (both Docker or both local): they share a queue
+through Redis but not their file storage. Local worker: `celery -A app.worker.celery_app worker --loglevel=info -P solo`
+(needs ffmpeg and the Piper voice files).
 
-```powershell
-celery -A app.worker.celery_app worker --loglevel=info -P solo
-```
-
-The worker needs the Piper voice files and ffmpeg; see the `PIPER_*` settings in `.env.example`.
-
-### 6.3 Frontend
-
-```powershell
-cd frontend
-node -v                          # must be 22.12 or newer
-npm install
-copy .env.example .env           # set the API URL (see the file)
-npm run dev                      # http://localhost:5173
-```
-
-## 7. Run everything with Docker
-
-```powershell
-docker compose build
-docker compose up -d postgres redis backend worker       # add "frontend" if you want it too
-docker compose ps                                        # all Up / healthy
-docker compose exec backend alembic upgrade head         # create tables (first run / after new migrations)
-```
-
-- API + Swagger: <http://localhost:8000/docs>
-- Logs: `docker compose logs -f backend` and `docker compose logs -f worker`
-- Stop: `docker compose stop` (keeps data). **Do not use `docker compose down -v` unless you want to wipe the database.**
-- **Important:** do not run a local `uvicorn` on port 8000 at the same time as the Docker backend; both listen on 8000 and
-  `localhost` may reach the wrong one.
-- Code is baked into the images. After changing backend code run `docker compose build backend worker` and
-  `docker compose up -d backend worker`.
-
-Named volumes: `educonnect_audiobook_audio` (generated MP3s), `educonnect_tts_cache`, `educonnect_piper_voices`,
-plus the uploads folder shared by backend and worker.
+Pinned dependencies that matter: `bcrypt==4.0.1` (passlib), `av>=14,<16` (faster-whisper; `av` 19 breaks it),
+`requirements.txt` must be saved as UTF-8.
 
 ## 8. Tests
 
-From `backend/` with the virtual environment active (PostgreSQL must be running):
-
 ```powershell
-pytest -q                                   # full suite, about 15-20 minutes
-pytest tests/test_audiobook_api.py -q       # audiobook API only
-alembic check                               # must print "No new upgrade operations detected."
+# backend (PostgreSQL must be running), from backend/ with the venv active
+pytest -q
+pytest tests/test_audiobook_api.py tests/test_voice_parser.py tests/test_voice_api.py -q
+alembic check                    # must print "No new upgrade operations detected."
+
+# frontend, from frontend/
+npx vitest run
+npm run build                    # type-checks (tsc -b) and builds
 ```
 
-Tests use a temporary storage folder, so they do not write into your real `storage/`.
+## 9. Using the app
 
-## 9. Try the audiobook flow in Swagger (<http://localhost:8000/docs>)
+**Teacher**
+1. Register as `teacher`, create a class, open it, click the **Audiobooks** tab.
+2. Upload a PDF/DOCX/TXT and give it a title. The card shows Queued -> Extracting -> Synthesizing -> Ready with a progress bar.
+   Large books take long (a 186-page physics book: about 80 minutes for 346 minutes of audio). Short files take about a minute.
+3. **Rebuild** re-queues a failed book; **Delete** removes it and its audio.
 
-1. `POST /api/v1/auth/register` (role `teacher`), then `POST /api/v1/auth/login`. Click **Authorize** and paste the token
-   (**access tokens expire after 15 minutes**; log in again when you get "Token has expired").
-2. `POST /api/v1/classrooms` and note the classroom `id`.
-3. `POST /api/v1/files/upload` with a small PDF, DOCX or TXT file (choose the file in the form). Note the file `id`.
-4. `POST /api/v1/classrooms/{classroom_id}/audiobooks` with `{"file_id": "<file id>", "title": "My book"}`.
-   Note the audiobook `id` (**not** the file id).
-5. `GET /api/v1/audiobooks` until the status is `ready` (`queued` -> `synthesizing` -> `ready`, or `failed`).
-6. `GET /api/v1/audiobooks/{audiobook_id}/manifest`, then `GET /api/v1/audiobooks/{audiobook_id}/segments/0/audio`.
-7. To retry a failed build use `POST /api/v1/audiobooks/{audiobook_id}/rebuild` (the create endpoint is idempotent and
-   will not re-queue an existing audiobook).
+**Student**
+1. Join the class with the code, then use **Audiobooks** in the top menu (or the class's Audiobooks tab) and press **Play**.
+2. Player: Space play/pause, Left/Right skip 30 s, `[` / `]` slower/faster, `N` / `P` next/previous chapter, `V` voice.
+   Chapters and topics are listed below the controls. The position is saved every 10 s and restored on the next visit.
 
-### Where the audio files are
+### Voice commands (turn on **A11y**, press `V` or the microphone, then speak)
 
-Docker: `/app/storage/audiobooks/<audiobook_id>/<seq>.mp3` inside the `worker` and `backend` containers.
+| Anywhere | Inside a book |
+|---|---|
+| "open audiobooks" / "what audiobooks do I have" | "play" / "pause" / "stop" / "resume" |
+| "play physics 2nd year" | "forward" / "backward" (30 seconds) |
+| "go home", "open my classes", "open to do" | "faster" / "slower" |
+| "help" | "next chapter" / "previous chapter" |
+| | "go to chapter two", "play topic kinetic theory", "play page 23" |
+| | "go to physics chapter 2 class 1st year" |
 
-```powershell
-docker compose exec worker ls -R /app/storage/audiobooks
-docker compose cp worker:/app/storage/audiobooks/<audiobook_id>/0.mp3 .\0.mp3     # copy to your PC and play it
-```
+Spoken replies, including "not found" messages, come from the backend. The microphone needs a secure context
+(`localhost` is fine; production must use HTTPS).
 
-Local (no Docker): `backend/storage/audiobooks/<audiobook_id>/<seq>.mp3` (or the folder set in `AUDIOBOOK_AUDIO_DIR`).
+## 10. Try the API in Swagger (<http://localhost:8000/docs>)
 
-## 10. Git workflow
+1. Register and log in, click **Authorize** (tokens expire after 15 minutes).
+2. `POST /classrooms`, `POST /files/upload`, then `POST /classrooms/{id}/audiobooks` with `{"file_id": "...", "title": "..."}`.
+3. `GET /audiobooks` until `ready`; `GET /audiobooks/{id}/manifest`; `GET /audiobooks/{id}/segments/0/audio`.
+4. `POST /voice/command` with `{"text": "go to chapter two in physics 2nd year"}`. **Do not** send Swagger's placeholder
+   `3fa85f64-...` as `audiobook_id`; delete the field or use a real id.
+5. Copy audio to your PC: `docker compose cp worker:/app/storage/audiobooks/<id> .\audio`.
+
+## 11. Demo-day checklist
+
+Do this 30 minutes before:
+
+1. Start Docker Desktop, then `docker compose up -d postgres redis backend worker`; `docker compose ps` shows everything Up.
+2. `cd frontend; npm run dev`; open <http://localhost:5173> in **Chrome**.
+3. Log in as the student, open **Audiobooks**: books show **Ready**. Press Play once to confirm sound.
+4. Turn on **A11y**, allow the microphone, press `V` and say "help".
+5. Have a teacher account ready and a **short** (1-2 page) file for a live upload (about a minute). Do not upload a large book live.
+6. Close other tabs that use the microphone. Use speakers or headphones at moderate volume.
+
+Suggested flow (about 5 minutes): teacher uploads the short file and the status changes to Ready -> log in as the student ->
+"open audiobooks" -> "play physics 2nd year" -> "go to chapter two" -> "forward" -> "faster" -> "pause" -> reload and show resume.
+
+## 12. Git workflow
 
 ```powershell
 git status
@@ -261,70 +189,71 @@ git commit -m "feat(scope): short description"
 git push
 ```
 
-Before committing check that `git status` shows no `.env`, `storage/` or `*.mp3` files. `requirements.txt` must stay UTF-8
-(PowerShell's `>` can write UTF-16, which breaks pip and Docker).
+Check that `git status` shows no `.env`, `storage/`, `*.mp3`, `physics_audio/` or helper scripts before committing.
 
-## 11. Troubleshooting (problems already met)
+## 13. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
-| Register returns 500, log says "password cannot be longer than 72 bytes" | `bcrypt` 5.x is incompatible with `passlib`. `requirements.txt` pins `bcrypt==4.0.1`. |
-| Swagger acts strangely / wrong user data | Two servers on port 8000 (local uvicorn and Docker). Stop one. `netstat -ano | findstr :8000` |
-| Audiobook stays `queued` | Backend could not reach Redis (`localhost:6379` in the log). The backend service needs `CELERY_BROKER_URL=redis://redis:6379/2`. |
-| Worker cannot write audio, "Permission denied" | Volume owned by root. The Dockerfile must create `/app/storage/audiobooks` before `chown`; remove the old volume once. |
-| `Token has expired` | Access tokens last 15 minutes. Log in again and re-authorize. |
-| Manifest / progress / search return 404 | You used the file id; use the audiobook id from the create response. |
-| Docker build is huge and slow | Missing `.dockerignore` (`.venv`, `storage/`, `tests/`, `.env` must be excluded). |
-| Worker shows `(unhealthy)` | Cosmetic; it inherits the API health check. Disable it for the worker in compose. |
-| `Cannot find native binding` (rolldown) on `npm install` | Node is too old; install Node 22.12+. |
+| Register returns 500 ("password cannot be longer than 72 bytes") | `bcrypt` 5.x vs `passlib`; keep `bcrypt==4.0.1`. |
+| Audiobook stays `queued` | The backend cannot reach Redis, or the worker is down. Backend needs `CELERY_BROKER_URL=redis://redis:6379/2`; check `docker compose logs worker`. |
+| Audiobook `failed` | `GET /audiobooks` shows the `error` text. Fix the cause, then `POST /audiobooks/{id}/rebuild`. |
+| Rebuild returns 409 | The book is queued/extracting/synthesizing. Delete it and upload again (stale-state fix is on the roadmap). |
+| Whisper crashes with `metadata_errors` | `av` 19 installed. `pip install "av>=14,<16"`. |
+| Voice says "open an audiobook first" | No book is open and none was named. Say "play physics 2nd year", or open a book first. |
+| Voice does nothing in Edge or Firefox | Use Chrome; other browsers use the slower server fallback or have no speech recognition. |
+| Voice does nothing after pressing `V` | Check microphone permission (lock icon in the address bar) and that **A11y** is on. |
+| Player says "still being prepared" | That part of the book is not synthesised yet. It retries automatically every 5 seconds. |
+| `docker compose` backend unreachable after `taskkill` of a PID | The Docker port forwarder was killed. `docker compose up -d --force-recreate backend` (or restart Docker Desktop). |
+| `Token has expired` | Tokens last 15 minutes; log in again. |
+| Console: `WebSocket ... /ws/notifications failed` | Notifications bell only; does not affect audio or voice. |
+| `Cannot find native binding` on `npm install` | Node too old; install 22.12+. |
+| Manifest/progress/search return 404 | You used the file id; use the audiobook id. |
 
-## 12. Deploying to Azure (outline)
+## 14. Roadmap and known limitations
 
-This is a recommended architecture and command outline. Check names, SKUs and prices in the Azure portal before use.
+- **Scanned (image-only) documents** need OCR; they are marked "Needs OCR". Images inside documents are skipped.
+- Cover, credits and the Contents page of a book are still read before chapter 1 (planned: skip pages before the first chapter).
+- Topic titles of OCR-quality PDFs can contain noise.
+- Only teachers can create audiobooks. **Planned:** students request audio for a file in their class (needs a permission change,
+  rate limiting and a "generate this chapter first" option so a student does not wait for a whole book).
+- Planned: stale-build recovery (rebuild after 30 minutes), voice not-found wording, **CI** (GitHub Actions), browser end-to-end tests
+  and axe accessibility checks, dependency lock file, notification WebSocket fix.
+
+## 15. Deploying to Azure (outline)
+
+Recommended architecture; check names, SKUs and prices in the Azure portal before use.
 
 | Component | Azure service |
 |---|---|
-| Container images | Azure Container Registry (ACR) |
-| API (`backend`) | Azure Container Apps (external ingress, port 8000) |
-| Celery `worker` | A second Container App, **no ingress**, same image, command `celery -A app.worker.celery_app worker ...` |
+| Images | Azure Container Registry |
+| API | Azure Container Apps (external ingress, port 8000) |
+| Celery worker | Second Container App, **no ingress**, same image, command `celery -A app.worker.celery_app worker ...` |
 | Database | Azure Database for PostgreSQL - Flexible Server |
-| Redis (cache + broker) | Azure Managed Redis (or Azure Cache for Redis) |
-| Uploads + generated audio | Azure Files share mounted into both apps (API and worker must see the same files) |
-| Frontend | Azure Static Web Apps (build `npm run build`) or a container with nginx |
-| Secrets | Azure Key Vault / Container Apps secrets |
-
-Steps:
+| Redis (cache + broker) | Azure Managed Redis (TLS) |
+| Uploads + audio | Azure Files share mounted into both apps (API and worker must see the same files) |
+| Frontend | Azure Static Web Apps (`npm run build`) or an nginx container |
+| Secrets | Key Vault / Container Apps secrets |
 
 ```powershell
 az login
 az group create -n educonnect-rg -l <region>
 az acr create -n <acrname> -g educonnect-rg --sku Basic
-az acr build -r <acrname> -t educonnect-backend:1 ./backend           # one image serves API and worker
-az postgres flexible-server create -g educonnect-rg -n <pgname> ...   # then create the database
+az acr build -r <acrname> -t educonnect-backend:1 ./backend        # one image for API and worker
+az postgres flexible-server create -g educonnect-rg -n <pgname> ...
 az containerapp env create -n educonnect-env -g educonnect-rg -l <region>
-# create the Azure Files share and register it in the environment (az containerapp env storage set ...)
+# create the Azure Files share and register it (az containerapp env storage set ...)
 az containerapp create -n educonnect-api ... --target-port 8000 --ingress external
-az containerapp create -n educonnect-worker ... --command ... (no ingress)
+az containerapp create -n educonnect-worker ... (no ingress)
 ```
 
-Things that will bite if forgotten:
+Things that bite if forgotten:
 
-1. **pg_trgm:** allow the extension on the Flexible Server (server parameter `azure.extensions` includes `PG_TRGM`) before running migrations.
-2. **Migrations:** run `alembic upgrade head` once as a job or one-off command against the Azure database before starting the API.
-3. **Redis TLS:** managed Redis uses TLS (`rediss://...`); the Celery broker URL and the app `REDIS_URL` need the TLS form and
-   the matching SSL options. Keep the long visibility timeout configured for the audiobook task.
-4. **Shared storage:** mount the same Azure Files share for `STORAGE_DIR` and `AUDIOBOOK_AUDIO_DIR` in both container apps, with
-   UID/GID matching the container user so the worker can write.
-5. **Environment variables:** set `DATABASE_URL`, `REDIS_URL`, `CELERY_BROKER_URL`, a strong `SECRET_KEY`, `CORS_ORIGINS` (your
-   frontend URL), the environment name `production`, storage paths, Piper/Whisper settings. Use secrets for passwords.
-6. **Sizing:** the worker (Piper, later faster-whisper) needs CPU and memory; start with 2 vCPU / 4 GB and measure.
-7. **Frontend:** build with the production API URL and make sure HTTPS is used end to end (microphones require a secure context).
-
-## 13. Roadmap
-
-- **F** voice backend: faster-whisper transcription endpoint and a voice-command parser (play, pause, forward/backward 30 s,
-  faster/slower, go to chapter / topic / page, spoken "not found" messages).
-- **G** frontend voice base (browser speech recognition first, server transcription as fallback).
-- **H** audiobook player with voice transport controls.
-- **I** hardening, CI (GitHub Actions), end-to-end browser tests.
-- Cleanup: show the build `error` to teachers, log worker failures, fail the audiobook if enqueue fails, pin all dependency versions in a lock file.
+1. Allow `PG_TRGM` (server parameter `azure.extensions`) before migrations.
+2. Run `alembic upgrade head` once against the Azure database before starting the API.
+3. Redis TLS: `rediss://` URLs for `REDIS_URL` and `CELERY_BROKER_URL`; keep the long visibility timeout for the audiobook task.
+4. Same Azure Files share for `STORAGE_DIR` and `AUDIOBOOK_AUDIO_DIR` in both apps, with matching UID/GID.
+5. Set `DATABASE_URL`, `REDIS_URL`, `CELERY_BROKER_URL`, a strong `SECRET_KEY`, `CORS_ORIGINS` (frontend URL), production environment name.
+6. Worker sizing: Piper and faster-whisper need CPU and memory (start at 2 vCPU / 4 GB and measure); the Whisper model downloads on first use,
+   so mount a persistent cache or bake the model into the image.
+7. Serve the frontend over HTTPS (microphone requires a secure context) and build it with the production API URL.
